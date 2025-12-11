@@ -1,0 +1,530 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Importar Productos - Paso 4{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .import-container {
+        max-width: 950px;
+        margin: 20px auto;
+        background: white;
+        padding: 25px 35px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .step-header {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .step-header h1 {
+        font-size: 18px;
+        margin: 0 0 4px 0;
+        color: #333;
+        font-weight: 600;
+    }
+    .step-header p {
+        font-size: 12px;
+        color: #666;
+        margin: 0;
+    }
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .step {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #666;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    .step.active {
+        background: #417690;
+        color: white;
+    }
+    .step.completed {
+        background: #4caf50;
+        color: white;
+    }
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: 11px;
+    }
+    .preview-table th {
+        background: #417690;
+        color: white;
+        padding: 8px 6px;
+        text-align: left;
+        position: sticky;
+        top: 0;
+        font-weight: 600;
+        font-size: 11px;
+    }
+    .preview-table td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        color: #555;
+    }
+    .preview-table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    .preview-table tr:hover {
+        background: #e3f2fd;
+    }
+    .codigo-change {
+        color: #ff9800;
+        font-weight: 600;
+    }
+    .info-box {
+        background: #f0f7fa;
+        border-left: 3px solid #2196f3;
+        padding: 10px 12px;
+        margin: 12px 0;
+        border-radius: 4px;
+    }
+    .info-box strong {
+        font-size: 13px;
+        color: #1976d2;
+    }
+    .info-box .stats {
+        margin-top: 5px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #555;
+    }
+    .warning-box {
+        background: #fffbf0;
+        border-left: 3px solid #ffc107;
+        padding: 10px 12px;
+        margin: 12px 0;
+        border-radius: 4px;
+    }
+    .warning-box strong {
+        font-size: 13px;
+        color: #856404;
+    }
+    .warning-box p {
+        margin: 5px 0 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #856404;
+    }
+    .table-container {
+        max-height: 380px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 12px 0;
+    }
+    .btn-custom {
+        background: #417690;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.3s;
+    }
+    .btn-custom:hover {
+        background: #2d5469;
+    }
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-block;
+        margin-right: 8px;
+        transition: background 0.3s;
+    }
+    .btn-back:hover {
+        background: #545b62;
+        color: white;
+        text-decoration: none;
+    }
+    h3.section-title {
+        font-size: 15px;
+        margin: 18px 0 10px 0;
+        color: #333;
+        font-weight: 600;
+    }
+
+    /* ===== AJUSTES PROFESIONALES PARA PÁGINAS DE IMPORTACIÓN ===== */
+
+    /* HEADER - Logo y título en línea horizontal */
+    #header {
+        padding: 12px 20px !important;
+        border-bottom: none !important;
+    }
+
+    #site-name a {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 15px !important;
+        background: none !important;
+    }
+
+    #site-name a:hover {
+        transform: none !important;
+        background: none !important;
+    }
+
+    .admin-logo {
+        height: 45px !important;
+        width: auto !important;
+    }
+
+    .brand-text {
+        display: flex !important;
+        flex-direction: column !important;
+        line-height: 1.3 !important;
+        justify-content: center !important;
+    }
+
+    .brand-title {
+        font-size: 1em !important;
+        letter-spacing: 1px !important;
+        font-weight: 700 !important;
+    }
+
+    .brand-subtitle {
+        font-size: 0.7em !important;
+        letter-spacing: 0.5px !important;
+        margin-top: 2px !important;
+    }
+
+    /* FOOTER PROFESIONAL */
+    #footer {
+        background: #2c3e50 !important;
+        color: #ecf0f1 !important;
+        padding: 20px 30px !important;
+        border-top: none !important;
+        margin-top: 40px !important;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+    }
+
+    .footer-content {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 20px !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+    }
+
+    .footer-section {
+        padding: 0 !important;
+        flex: 1 !important;
+        min-width: 200px !important;
+    }
+
+    .footer-section h4 {
+        color: #ffffff !important;
+        font-size: 0.95em !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .footer-section p {
+        color: #bdc3c7 !important;
+        margin: 6px 0 !important;
+        font-size: 0.85em !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        line-height: 1.5 !important;
+    }
+
+    .footer-section a {
+        color: #3498db !important;
+        text-decoration: none !important;
+        transition: color 0.2s ease !important;
+        font-weight: 500 !important;
+    }
+
+    .footer-section a:hover {
+        color: #5dade2 !important;
+    }
+
+    .footer-section i {
+        color: #3498db !important;
+        width: 18px !important;
+        text-align: center !important;
+        font-size: 1em !important;
+    }
+
+    .footer-section:first-child h4 {
+        font-size: 1.05em !important;
+        color: #3498db !important;
+    }
+
+    .footer-section:last-child p {
+        font-size: 0.8em !important;
+        color: #95a5a6 !important;
+    }
+
+    /* ===== MEJORA DE BOTONES ===== */
+
+    /* Botón Principal (Siguiente, Confirmar, etc.) */
+    .btn-custom,
+    button[type="submit"].btn-custom,
+    input[type="submit"].btn-custom {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3) !important;
+        text-transform: none !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    .btn-custom:hover,
+    button[type="submit"].btn-custom:hover {
+        background: linear-gradient(135deg, #229954 0%, #1e8449 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(39, 174, 96, 0.4) !important;
+        color: #ffffff !important;
+    }
+
+    .btn-custom:disabled {
+        background: #95a5a6 !important;
+        cursor: not-allowed !important;
+        opacity: 0.6 !important;
+        transform: none !important;
+    }
+
+    /* Botón Atrás / Cancelar - MEJORADO CON TEXTO BLANCO */
+    .btn-back,
+    .btn-cancel,
+    a.btn-back,
+    a.btn-cancel,
+    button.btn-back {
+        background: #5d6d7e !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(93, 109, 126, 0.3) !important;
+        margin-right: 10px !important;
+    }
+
+    .btn-back:hover,
+    .btn-cancel:hover,
+    a.btn-back:hover,
+    a.btn-cancel:hover {
+        background: #4a5a6a !important;
+        color: #ffffff !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(93, 109, 126, 0.4) !important;
+    }
+
+    /* Botón secundario adicional */
+    .btn-custom.btn-secondary {
+        background: #3498db !important;
+        box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3) !important;
+    }
+
+    .btn-custom.btn-secondary:hover {
+        background: #2980b9 !important;
+        box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4) !important;
+    }
+
+    /* Asegurar que todos los textos de botones sean blancos */
+    .btn-custom,
+    .btn-custom *,
+    .btn-back,
+    .btn-back *,
+    .btn-cancel,
+    .btn-cancel *,
+    button[type="submit"],
+    button[type="submit"] * {
+        color: #ffffff !important;
+    }
+
+    /* Contenedor de botones */
+    div[style*="text-align: center"] {
+        margin-top: 25px !important;
+        padding-top: 15px !important;
+        border-top: 1px solid #e0e0e0 !important;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        #site-name a {
+            gap: 10px !important;
+        }
+        
+        .admin-logo {
+            height: 40px !important;
+        }
+        
+        .brand-title {
+            font-size: 0.9em !important;
+        }
+        
+        .brand-subtitle {
+            font-size: 0.65em !important;
+        }
+        
+        #footer {
+            padding: 15px 20px !important;
+        }
+        
+        .footer-content {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 15px !important;
+        }
+        
+        .footer-section {
+            width: 100% !important;
+        }
+        
+        .footer-section h4,
+        .footer-section p {
+            justify-content: flex-start !important;
+        }
+        
+        /* Botones responsive */
+        .btn-custom,
+        .btn-back,
+        .btn-cancel {
+            padding: 10px 18px !important;
+            font-size: 13px !important;
+            margin: 5px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-container">
+    <div class="step-header">
+        <h1>Importar Productos desde Excel</h1>
+        <p>Paso 4 de 5: Vista previa de importación</p>
+    </div>
+
+    <div class="step-indicator">
+        <div class="step completed">1</div>
+        <div class="step completed">2</div>
+        <div class="step completed">3</div>
+        <div class="step active">4</div>
+        <div class="step">5</div>
+    </div>
+
+    <div class="info-box">
+        <strong>📊 Resumen de la importación:</strong>
+        <div class="stats">
+            • Total de productos a importar: <strong>{{ total_registros }}</strong><br>
+            • Mostrando vista previa de los primeros 20 registros
+        </div>
+    </div>
+
+    {% if vista_previa %}
+    <h3 class="section-title">Vista previa de productos:</h3>
+    
+    <div class="table-container">
+        <table class="preview-table">
+            <thead>
+                <tr>
+                    <th>Código Original</th>
+                    <th>Código Nuevo</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Unidad de Medida</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in vista_previa %}
+                <tr>
+                    <td>{{ item.codigo_original }}</td>
+                    <td>
+                        {% if item.codigo_original != item.codigo_nuevo %}
+                            <span class="codigo-change">{{ item.codigo_nuevo }}</span>
+                        {% else %}
+                            {{ item.codigo_nuevo }}
+                        {% endif %}
+                    </td>
+                    <td>{{ item.nombre }}</td>
+                    <td>{{ item.categoria }}</td>
+                    <td>{{ item.unidad }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_registros > 20 %}
+    <p style="text-align: center; color: #666; margin-top: 6px; font-size: 12px;">
+        <em>... y {{ total_registros|add:"-20" }} productos más</em>
+    </p>
+    {% endif %}
+
+    <div class="warning-box">
+        <strong>⚠️ Confirmación requerida</strong>
+        <p>Revise la vista previa antes de continuar. Los cambios serán permanentes una vez confirmados.</p>
+    </div>
+
+    <form method="post" id="confirmForm">
+        {% csrf_token %}
+        <input type="hidden" name="paso" value="4">
+        <input type="hidden" name="confirmar" value="si">
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button type="button" class="btn-back" onclick="irAtras()">← Atrás</button>
+            <button type="submit" class="btn-custom">✅ Confirmar e Importar</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="warning-box">
+        <strong>⛔ Error:</strong>
+        <p>No se pudo generar la vista previa.</p>
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="{% url 'admin:productos_producto_importar' %}" class="btn-back">← Volver a empezar</a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function irAtras() {
+    // Redirigir al inicio del proceso de importación
+    window.location.href = '{% url "admin:productos_producto_importar" %}';
+}
+</script>
+{% endblock %}

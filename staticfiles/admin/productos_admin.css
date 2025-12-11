@@ -1,0 +1,55 @@
+/* Estilos para resaltar campos obligatorios con asterisco */
+
+/* Agregar asterisco rojo a los labels de campos obligatorios */
+.form-row .required label:after,
+.form-row.field-tipo label:after,
+.form-row.field-nombre label:after,
+.form-row.field-categoria label:after,
+.form-row.field-unidad_medida label:after,
+.form-row.field-abreviatura label:after {
+    content: " *";
+    color: #d9534f;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* Estilo para el botón cancelar */
+.submit-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.cancel-link {
+    background-color: #ba2121 !important;
+    color: white !important;
+    padding: 10px 15px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    transition: background-color 0.3s ease !important;
+    margin-left: 10px !important;
+}
+
+.cancel-link:hover {
+    background-color: #a41515 !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+/* Asegurar que los campos obligatorios tengan el borde destacado cuando están vacíos */
+.form-row.errors input,
+.form-row.errors select,
+.form-row.errors textarea {
+    border: 2px solid #d9534f !important;
+}
+
+/* Mejorar la visibilidad del mensaje de campos obligatorios */
+.field-box .help {
+    color: #666;
+    font-size: 12px;
+    font-style: italic;
+}

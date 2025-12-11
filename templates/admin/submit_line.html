@@ -1,0 +1,14 @@
+{% load i18n admin_urls %}
+<div class="submit-row">
+    {% block submit-row %}
+        {% if show_save %}<input type="submit" value="{% translate 'Save' %}" class="default" name="_save">{% endif %}
+        {% if show_delete_link %}
+            {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
+            <p class="deletelink-box"><a href="{{ delete_url }}" class="deletelink">{% translate "Delete" %}</a></p>
+        {% endif %}
+        {% if show_save_as_new %}<input type="submit" value="{% translate 'Save as new' %}" name="_saveasnew">{% endif %}
+        {% if show_save_and_add_another %}<input type="submit" value="{% translate 'Save and add another' %}" name="_addanother">{% endif %}
+        {% if show_save_and_continue %}<input type="submit" value="{% translate 'Save and continue editing' %}" name="_continue">{% endif %}
+        {% if show_cancel %}<a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link" style="background-color: #ba2121; color: white; padding: 10px 15px; margin-left: 10px;">{% translate "Cancel" %}</a>{% endif %}
+    {% endblock %}
+</div>

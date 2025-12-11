@@ -1,0 +1,691 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Importar Productos - Paso 3{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .import-container {
+        max-width: 900px;
+        margin: 20px auto;
+        background: white;
+        padding: 25px 35px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .step-header {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .step-header h1 {
+        font-size: 18px;
+        margin: 0 0 4px 0;
+        color: #333;
+        font-weight: 600;
+    }
+    .step-header p {
+        font-size: 12px;
+        color: #666;
+        margin: 0;
+    }
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .step {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #666;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    .step.active {
+        background: #417690;
+        color: white;
+    }
+    .step.completed {
+        background: #4caf50;
+        color: white;
+    }
+    .option-card {
+        border: 2px solid #ddd;
+        border-radius: 6px;
+        padding: 15px 18px;
+        margin: 12px 0;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: white;
+        display: block;
+    }
+    .option-card:hover {
+        border-color: #417690;
+        background: #fafafa;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .option-card input[type="radio"] {
+        margin-right: 10px;
+        transform: scale(1.2);
+        cursor: pointer;
+        vertical-align: top;
+        margin-top: 2px;
+        float: left;
+    }
+    .option-card.selected {
+        border-color: #417690;
+        background: #f0f7fa;
+        box-shadow: 0 2px 10px rgba(65,118,144,0.15);
+    }
+    .option-card .card-content {
+        overflow: hidden;
+    }
+    .option-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.4;
+    }
+    .option-card h4 .emoji {
+        font-size: 18px;
+    }
+    .option-card p {
+        margin: 8px 0;
+        line-height: 1.5;
+        font-size: 13px;
+        color: #555;
+    }
+    .option-card .info-content {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 8px;
+    }
+    .option-card .info-content ul {
+        margin: 6px 0;
+        padding-left: 16px;
+        line-height: 1.6;
+    }
+    .option-card .info-content li {
+        font-size: 12px;
+        color: #555;
+        margin: 3px 0;
+    }
+    .option-card .info-content code {
+        background: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        color: #d32f2f;
+        font-size: 11px;
+    }
+    .tipo-selector {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 2px dashed #ccc;
+    }
+    .tipo-btn {
+        padding: 10px 15px;
+        border: 2px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-align: center;
+    }
+    .tipo-btn:hover {
+        border-color: #417690;
+        background: #e3f2fd;
+        transform: translateY(-1px);
+    }
+    .tipo-btn.selected {
+        border-color: #417690;
+        background: #417690;
+        color: white;
+    }
+    .tipo-btn strong {
+        font-size: 15px;
+    }
+    .tipo-confirmacion {
+        background: #e8f5e9;
+        padding: 8px 10px;
+        border-radius: 4px;
+        margin-top: 8px;
+        border-left: 3px solid #4caf50;
+        display: none;
+    }
+    .tipo-confirmacion p {
+        margin: 0;
+        font-size: 12px;
+        color: #2e7d32;
+        font-weight: 500;
+    }
+    .info-box {
+        background: #f0f7fa;
+        border-left: 4px solid #2196f3;
+        padding: 12px 15px;
+        margin: 12px 0;
+        border-radius: 4px;
+    }
+    .info-box strong {
+        font-size: 14px;
+        display: block;
+        margin-bottom: 6px;
+        color: #1976d2;
+    }
+    .info-box ul {
+        margin: 6px 0;
+        padding-left: 16px;
+        line-height: 1.6;
+    }
+    .info-box li {
+        font-size: 12px;
+        color: #555;
+        margin: 3px 0;
+    }
+    .info-box code {
+        background: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        color: #d32f2f;
+        font-size: 11px;
+    }
+    .btn-custom {
+        background: #417690;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.3s;
+    }
+    .btn-custom:hover {
+        background: #2d5469;
+    }
+    .btn-custom:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-block;
+        transition: background 0.3s;
+        margin-right: 8px;
+    }
+    .btn-back:hover {
+        background: #545b62;
+        color: white;
+        text-decoration: none;
+    }
+    h3.section-title {
+        font-size: 16px;
+        margin: 20px 0 12px 0;
+        color: #333;
+        font-weight: 600;
+    }
+
+    /* ===== AJUSTES PROFESIONALES PARA PÁGINAS DE IMPORTACIÓN ===== */
+
+    /* HEADER - Logo y título en línea horizontal */
+    #header {
+        padding: 12px 20px !important;
+        border-bottom: none !important;
+    }
+
+    #site-name a {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 15px !important;
+        background: none !important;
+    }
+
+    #site-name a:hover {
+        transform: none !important;
+        background: none !important;
+    }
+
+    .admin-logo {
+        height: 45px !important;
+        width: auto !important;
+    }
+
+    .brand-text {
+        display: flex !important;
+        flex-direction: column !important;
+        line-height: 1.3 !important;
+        justify-content: center !important;
+    }
+
+    .brand-title {
+        font-size: 1em !important;
+        letter-spacing: 1px !important;
+        font-weight: 700 !important;
+    }
+
+    .brand-subtitle {
+        font-size: 0.7em !important;
+        letter-spacing: 0.5px !important;
+        margin-top: 2px !important;
+    }
+
+    /* FOOTER PROFESIONAL */
+    #footer {
+        background: #2c3e50 !important;
+        color: #ecf0f1 !important;
+        padding: 20px 30px !important;
+        border-top: none !important;
+        margin-top: 40px !important;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+    }
+
+    .footer-content {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 20px !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+    }
+
+    .footer-section {
+        padding: 0 !important;
+        flex: 1 !important;
+        min-width: 200px !important;
+    }
+
+    .footer-section h4 {
+        color: #ffffff !important;
+        font-size: 0.95em !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .footer-section p {
+        color: #bdc3c7 !important;
+        margin: 6px 0 !important;
+        font-size: 0.85em !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        line-height: 1.5 !important;
+    }
+
+    .footer-section a {
+        color: #3498db !important;
+        text-decoration: none !important;
+        transition: color 0.2s ease !important;
+        font-weight: 500 !important;
+    }
+
+    .footer-section a:hover {
+        color: #5dade2 !important;
+    }
+
+    .footer-section i {
+        color: #3498db !important;
+        width: 18px !important;
+        text-align: center !important;
+        font-size: 1em !important;
+    }
+
+    .footer-section:first-child h4 {
+        font-size: 1.05em !important;
+        color: #3498db !important;
+    }
+
+    .footer-section:last-child p {
+        font-size: 0.8em !important;
+        color: #95a5a6 !important;
+    }
+
+    /* ===== MEJORA DE BOTONES ===== */
+
+    /* Botón Principal (Siguiente, Confirmar, etc.) */
+    .btn-custom,
+    button[type="submit"].btn-custom,
+    input[type="submit"].btn-custom {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3) !important;
+        text-transform: none !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    .btn-custom:hover,
+    button[type="submit"].btn-custom:hover {
+        background: linear-gradient(135deg, #229954 0%, #1e8449 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(39, 174, 96, 0.4) !important;
+        color: #ffffff !important;
+    }
+
+    .btn-custom:disabled {
+        background: #95a5a6 !important;
+        cursor: not-allowed !important;
+        opacity: 0.6 !important;
+        transform: none !important;
+    }
+
+    /* Botón Atrás / Cancelar - MEJORADO CON TEXTO BLANCO */
+    .btn-back,
+    .btn-cancel,
+    a.btn-back,
+    a.btn-cancel,
+    button.btn-back {
+        background: #5d6d7e !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(93, 109, 126, 0.3) !important;
+        margin-right: 10px !important;
+    }
+
+    .btn-back:hover,
+    .btn-cancel:hover,
+    a.btn-back:hover,
+    a.btn-cancel:hover {
+        background: #4a5a6a !important;
+        color: #ffffff !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(93, 109, 126, 0.4) !important;
+    }
+
+    /* Botón secundario adicional */
+    .btn-custom.btn-secondary {
+        background: #3498db !important;
+        box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3) !important;
+    }
+
+    .btn-custom.btn-secondary:hover {
+        background: #2980b9 !important;
+        box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4) !important;
+    }
+
+    /* Asegurar que todos los textos de botones sean blancos */
+    .btn-custom,
+    .btn-custom *,
+    .btn-back,
+    .btn-back *,
+    .btn-cancel,
+    .btn-cancel *,
+    button[type="submit"],
+    button[type="submit"] * {
+        color: #ffffff !important;
+    }
+
+    /* Contenedor de botones */
+    div[style*="text-align: center"] {
+        margin-top: 25px !important;
+        padding-top: 15px !important;
+        border-top: 1px solid #e0e0e0 !important;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        #site-name a {
+            gap: 10px !important;
+        }
+        
+        .admin-logo {
+            height: 40px !important;
+        }
+        
+        .brand-title {
+            font-size: 0.9em !important;
+        }
+        
+        .brand-subtitle {
+            font-size: 0.65em !important;
+        }
+        
+        #footer {
+            padding: 15px 20px !important;
+        }
+        
+        .footer-content {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 15px !important;
+        }
+        
+        .footer-section {
+            width: 100% !important;
+        }
+        
+        .footer-section h4,
+        .footer-section p {
+            justify-content: flex-start !important;
+        }
+        
+        /* Botones responsive */
+        .btn-custom,
+        .btn-back,
+        .btn-cancel {
+            padding: 10px 18px !important;
+            font-size: 13px !important;
+            margin: 5px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-container">
+    <div class="step-header">
+        <h1>Importar Productos desde Excel</h1>
+        <p>Paso 3 de 5: Método para códigos</p>
+    </div>
+
+    <div class="step-indicator">
+        <div class="step completed">1</div>
+        <div class="step completed">2</div>
+        <div class="step active">3</div>
+        <div class="step">4</div>
+        <div class="step">5</div>
+    </div>
+
+    <h3 class="section-title">¿Cómo desea manejar los códigos de productos?</h3>
+
+    <form method="post" id="codigoForm">
+        {% csrf_token %}
+        <input type="hidden" name="paso" value="3">
+        <input type="hidden" name="tipo_producto" id="tipo_producto" value="">
+
+        <label class="option-card" for="radio_mantener">
+            <input type="radio" id="radio_mantener" name="metodo_codigo" value="mantener" required onclick="selectMetodo(this.parentElement, 'mantener')">
+            <div class="card-content">
+                <h4>
+                    <span class="emoji">📋</span>
+                    Mantener códigos del archivo Excel
+                </h4>
+                <p>Se usarán los códigos de la columna A. El sistema realizará validaciones automáticas:</p>
+                <div class="info-content">
+                    <ul>
+                        <li>Validar formato: Letra + 4 dígitos (ej: <code>I0001</code>)</li>
+                        <li>Ajustar longitud: Si faltan dígitos rellena con ceros (<code>I5</code> → <code>I0005</code>)</li>
+                        <li>Truncar exceso: Si tiene más de 4 dígitos ajusta (<code>I12345</code> → <code>I9999</code>)</li>
+                        <li>Re-enumerar duplicados: Genera consecutivos si el código ya existe</li>
+                        <li>Validar iniciales: Pregunta qué hacer con iniciales no reconocidas (I/E/H/O)</li>
+                    </ul>
+                </div>
+            </div>
+        </label>
+
+        <label class="option-card" for="radio_reasignar">
+            <input type="radio" id="radio_reasignar" name="metodo_codigo" value="reasignar" required onclick="selectMetodo(this.parentElement, 'reasignar')">
+            <div class="card-content">
+                <h4>
+                    <span class="emoji">🔄</span>
+                    Reasignar códigos según tipo de producto
+                </h4>
+                <p>Ignora los códigos del Excel y genera nuevos automáticos. Seleccione el tipo:</p>
+                <div class="tipo-selector" id="tipoSelector" style="display: none;">
+                    <div class="tipo-btn" onclick="selectTipo(this, 'INSUMOS'); return false;">
+                        <strong>I</strong> <span>Insumos</span>
+                    </div>
+                    <div class="tipo-btn" onclick="selectTipo(this, 'EQUIPOS'); return false;">
+                        <strong>E</strong> <span>Equipos</span>
+                    </div>
+                    <div class="tipo-btn" onclick="selectTipo(this, 'HERRAMIENTAS'); return false;">
+                        <strong>H</strong> <span>Herramientas</span>
+                    </div>
+                    <div class="tipo-btn" onclick="selectTipo(this, 'OTROS'); return false;">
+                        <strong>O</strong> <span>Otros</span>
+                    </div>
+                </div>
+                <div class="tipo-confirmacion" id="tipo-confirmacion">
+                    <p>✅ Se generarán códigos automáticos del tipo seleccionado</p>
+                </div>
+            </div>
+        </label>
+
+        <div class="info-box">
+            <strong>ℹ️ Información sobre códigos:</strong>
+            <ul>
+                <li>Si un código está vacío en el Excel, se genera automáticamente</li>
+                <li>Formato requerido: <code>Letra (I/E/H/O)</code> + <code>4 dígitos (0001-9999)</code></li>
+                <li>Ejemplos válidos: <code>I0001</code>, <code>E0023</code>, <code>H0456</code>, <code>O9999</code></li>
+                <li>Límite máximo: 9999 productos por tipo</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button type="button" class="btn-back" onclick="irAtras()">← Atrás</button>
+            <button type="submit" class="btn-custom" id="btnSiguiente">Siguiente →</button>
+        </div>
+    </form>
+
+    <!-- Formulario oculto para volver al paso 2 -->
+    <form method="post" id="backForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="paso" value="1">
+    </form>
+</div>
+
+<script>
+let metodoSeleccionado = null;
+let tipoSeleccionado = null;
+
+function selectMetodo(card, metodo) {
+    metodoSeleccionado = metodo;
+    
+    console.log('Método seleccionado:', metodo); // Debug
+    
+    // Remover selección anterior
+    document.querySelectorAll('.option-card').forEach(c => {
+        c.classList.remove('selected');
+    });
+    
+    // Marcar como seleccionado
+    card.classList.add('selected');
+    
+    // Mostrar/ocultar selector de tipo
+    const tipoSelector = document.getElementById('tipoSelector');
+    const tipoConfirmacion = document.getElementById('tipo-confirmacion');
+    
+    if (metodo === 'reasignar') {
+        tipoSelector.style.display = 'grid';
+        // Resetear tipo seleccionado
+        tipoSeleccionado = null;
+        document.getElementById('tipo_producto').value = '';
+        document.querySelectorAll('.tipo-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        tipoConfirmacion.style.display = 'none';
+    } else {
+        tipoSelector.style.display = 'none';
+        tipoConfirmacion.style.display = 'none';
+        tipoSeleccionado = 'mantener';
+        document.getElementById('tipo_producto').value = '';
+    }
+}
+
+function selectTipo(btn, tipo) {
+    tipoSeleccionado = tipo;
+    
+    console.log('Tipo seleccionado:', tipo); // Debug
+    
+    // Remover selección anterior
+    document.querySelectorAll('.tipo-btn').forEach(b => {
+        b.classList.remove('selected');
+    });
+    
+    // Marcar como seleccionado
+    btn.classList.add('selected');
+    document.getElementById('tipo_producto').value = tipo;
+    
+    console.log('Input tipo_producto value:', document.getElementById('tipo_producto').value); // Debug
+    
+    // Mostrar confirmación
+    document.getElementById('tipo-confirmacion').style.display = 'block';
+    
+    return false;
+}
+
+function irAtras() {
+    // Redirigir al paso 1 para que el flujo normal muestre el paso 2
+    window.location.href = '{% url "admin:productos_producto_importar" %}';
+}
+
+// Validar antes de enviar
+document.getElementById('codigoForm').addEventListener('submit', function(e) {
+    console.log('Submit - Método:', metodoSeleccionado, 'Tipo:', tipoSeleccionado); // Debug
+    console.log('Input value:', document.getElementById('tipo_producto').value); // Debug
+    
+    if (metodoSeleccionado === 'reasignar' && !tipoSeleccionado) {
+        e.preventDefault();
+        alert('⛔ Debe seleccionar un tipo de producto (I, E, H o O)');
+        return false;
+    }
+    return true;
+});
+</script>
+{% endblock %}

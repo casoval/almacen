@@ -1,0 +1,1920 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    
+    .stock-container {
+        padding: 20px;
+        max-width: 100%;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .page-header h1 {
+        margin: 0 0 10px 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .page-header p {
+        margin: 0;
+        font-size: 15px;
+        opacity: 0.95;
+    }
+    
+    /* Filtros Mejorados */
+    .filters-container {
+        background: #2c3e50;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .filter-group label {
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #ecf0f1;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 14px 16px;
+        border: 1px solid #95a5a6;
+        border-radius: 6px;
+        font-size: 15px;
+        background: #ffffff;
+        transition: all 0.3s ease;
+        width: 100%;
+        height: 48px;
+        line-height: 1.5;
+    }
+    
+    .filter-group select {
+        cursor: pointer;
+    }
+    
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .filter-checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+    }
+    
+    .filter-checkbox-group input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+    
+    .filter-checkbox-group label {
+        color: #ecf0f1;
+        font-size: 14px;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: normal;
+        cursor: pointer;
+        margin: 0;
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 13px 26px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-info {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-info:hover {
+        background: #7f8c8d;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn svg {
+        flex-shrink: 0;
+    }
+    
+    /* Tarjetas de Estadísticas Mejoradas */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid #667eea;
+        cursor: pointer;
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        border-left-color: #5568d3;
+    }
+    
+    .stat-card:hover::before {
+        opacity: 1;
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 15px 0;
+        font-size: 13px;
+        color: #bdc3c7;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .stat-card .number {
+        font-size: 38px;
+        font-weight: 700;
+        color: #ecf0f1;
+        position: relative;
+        z-index: 1;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .stat-card .subtitle {
+        font-size: 12px;
+        color: #95a5a6;
+        margin-top: 8px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .stat-card.danger {
+        border-left-color: #e74c3c;
+    }
+    
+    .stat-card.success {
+        border-left-color: #27ae60;
+    }
+    
+    .stat-card.warning {
+        border-left-color: #f39c12;
+    }
+    
+    .stat-card.info {
+        border-left-color: #3498db;
+    }
+    
+    /* Info Box Mejorado */
+    .info-box {
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        border-left: 5px solid #27ae60;
+        border-radius: 8px;
+        padding: 20px 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .info-box h4 {
+        margin: 0 0 15px 0;
+        color: #1b5e20;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .info-box ul {
+        margin: 0;
+        padding-left: 25px;
+    }
+    
+    .info-box li {
+        margin-bottom: 8px;
+        color: #2e7d32;
+        line-height: 1.6;
+    }
+    
+    .info-box li strong {
+        color: #1b5e20;
+    }
+    
+    /* Tabla Mejorada */
+    .table-container {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow-x: auto;
+        margin-bottom: 25px;
+    }
+    
+    .table-container h2 {
+        margin: 0 0 20px 0;
+        color: #2c3e50;
+        font-size: 20px;
+        font-weight: 700;
+        border-bottom: 3px solid #667eea;
+        padding-bottom: 10px;
+    }
+    
+    .stock-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1200px;
+    }
+    
+    .stock-table thead tr {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    }
+    
+    .stock-table th {
+        padding: 16px 14px;
+        text-align: left;
+        font-weight: 700;
+        color: #ecf0f1;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 3px solid #667eea;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+    }
+    
+    .stock-table th.text-right {
+        text-align: right;
+    }
+    
+    .stock-table td {
+        padding: 14px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+        color: #4a5568;
+        white-space: nowrap;
+    }
+    
+    .stock-table td.text-right {
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    .stock-table tbody tr {
+        transition: all 0.2s ease;
+        background: #ffffff;
+    }
+    
+    .stock-table tbody tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    
+    .stock-table tbody tr:hover {
+        background: #e3f2fd;
+        transform: scale(1.01);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .stock-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .stock-bueno {
+        color: #27ae60;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .stock-danado {
+        color: #e74c3c;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .stock-total {
+        color: #3498db;
+        font-weight: 700;
+        font-size: 16px;
+        background: #e3f2fd;
+        padding: 6px 12px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .codigo-badge {
+        background: #667eea;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 12px;
+        display: inline-block;
+    }
+    
+    .almacen-badge {
+        background: #34495e;
+        color: white;
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 13px;
+        display: inline-block;
+    }
+    
+    .no-data {
+        text-align: center;
+        padding: 50px;
+        color: #95a5a6;
+        font-size: 16px;
+        font-weight: 500;
+    }
+    
+    /* Resúmenes Laterales Mejorados */
+    .summaries-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+    }
+    
+    .sidebar-summary {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-top: 4px solid #667eea;
+    }
+    
+    .sidebar-summary h3 {
+        margin: 0 0 20px 0;
+        font-size: 18px;
+        color: #2c3e50;
+        font-weight: 700;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 12px;
+    }
+    
+    .summary-item {
+        padding: 14px;
+        border-bottom: 1px solid #e9ecef;
+        transition: all 0.2s ease;
+        border-radius: 6px;
+    }
+    
+    .summary-item:hover {
+        background: #f8f9fa;
+        padding-left: 18px;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+    
+    .summary-item strong {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 15px;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .summary-item .details {
+        color: #546e7a;
+        font-size: 13px;
+    }
+    
+    .summary-item .value {
+        color: #667eea;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    /* Indicadores de Stock Bajo */
+    .stock-alert {
+        background: #fff3cd;
+        border-left: 4px solid #f39c12;
+        padding: 15px 20px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    .stock-alert h4 {
+        margin: 0 0 10px 0;
+        color: #856404;
+        font-size: 15px;
+        font-weight: 700;
+    }
+    
+    .stock-alert p {
+        margin: 0;
+        color: #856404;
+        font-size: 14px;
+    }
+    
+    /* Botón de acción en tabla */
+    .btn-ver-detalle {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-ver-detalle:hover {
+        background: #5568d3;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    
+    /* Modal Styles */
+    .stock-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        max-width: 900px;
+        width: 90%;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        animation: modalSlideIn 0.3s ease;
+        border: 2px solid #e2e8f0;
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .modal-header {
+        padding: 25px 30px;
+        border-bottom: 3px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .modal-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        font-size: 28px;
+        color: #ffffff;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        border-radius: 4px;
+    }
+    
+    .modal-close:hover {
+        background: #e74c3c;
+        border-color: #e74c3c;
+        transform: rotate(90deg);
+    }
+    
+    .modal-body {
+        padding: 25px;
+        overflow-y: auto;
+        flex: 1;
+        background: #f8f9fa;
+    }
+    
+    .modal-footer {
+        padding: 20px 30px;
+        border-top: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        background: #ffffff;
+        border-radius: 0 0 12px 12px;
+    }
+    
+    .detalle-estadistica-card {
+        background: white;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 4px solid #667eea;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    .detalle-estadistica-card h4 {
+        margin: 0 0 15px 0;
+        color: #2c3e50;
+        font-size: 16px;
+        font-weight: 700;
+    }
+    
+    .detalle-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .detalle-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detalle-label {
+        color: #546e7a;
+        font-weight: 600;
+    }
+    
+    .detalle-value {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    .cantidad-buena {
+        color: #27ae60;
+    }
+    
+    .cantidad-danada {
+        color: #e74c3c;
+    }
+    
+    .movimiento-mini {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        transition: background 0.2s ease;
+    }
+    
+    .movimiento-mini:hover {
+        background: #e3f2fd;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .filter-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .stats-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .summaries-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .button-group {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stock-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1>📊 {{ title }}</h1>
+        <p>Vista detallada del inventario actual en todos los almacenes con análisis completo</p>
+    </div>
+    
+    <!-- Alerta de Stock Bajo -->
+    {% if productos_bajo_minimo %}
+    <div class="stock-alert">
+        <h4>⚠️ Alerta: {{ productos_bajo_minimo|length }} producto(s) por debajo del stock mínimo</h4>
+        <p>Se requiere atención inmediata para evitar desabastecimiento</p>
+    </div>
+    {% endif %}
+    
+    <!-- Información del Sistema -->
+    <div class="info-box">
+        <h4>ℹ️ ¿Cómo se calcula el stock?</h4>
+        <ul>
+            <li><strong>Entradas:</strong> Suma de todos los movimientos ENTRADA hacia este almacén</li>
+            <li><strong>Salidas:</strong> Suma de todos los movimientos SALIDA desde este almacén</li>
+            <li><strong>Traslados:</strong> Diferencia entre traslados recibidos y enviados</li>
+            <li><strong>Stock Total:</strong> Entradas - Salidas +/- Traslados</li>
+            <li><strong>Actualización:</strong> El stock se calcula en tiempo real a partir de todos los movimientos registrados</li>
+        </ul>
+    </div>
+    
+    <!-- Estadísticas Principales -->
+    <div class="stats-container">
+        <div class="stat-card info" onclick="verDetalleEstadistica('total_productos')">
+            <h3>Total Productos</h3>
+            <div class="number">{{ estadisticas.total_productos|default:"0" }}</div>
+            <div class="subtitle">En el sistema</div>
+        </div>
+        <div class="stat-card success" onclick="verDetalleEstadistica('stock_bueno')">
+            <h3>Stock en Buen Estado</h3>
+            <div class="number">{{ estadisticas.stock_bueno_total|floatformat:"-2"|default:"0" }}</div>
+            <div class="subtitle">Unidades disponibles</div>
+        </div>
+        <div class="stat-card danger" onclick="verDetalleEstadistica('stock_danado')">
+            <h3>Stock Dañado</h3>
+            <div class="number">{{ estadisticas.stock_danado_total|floatformat:"-2"|default:"0" }}</div>
+            <div class="subtitle">Requiere gestión</div>
+        </div>
+        <div class="stat-card info" onclick="verDetalleEstadistica('total_almacenes')">
+            <h3>Almacenes Activos</h3>
+            <div class="number">{{ estadisticas.total_almacenes|default:"0" }}</div>
+            <div class="subtitle">Ubicaciones</div>
+        </div>
+        <div class="stat-card warning" onclick="verDetalleEstadistica('bajo_minimo')">
+            <h3>Bajo Stock Mínimo</h3>
+            <div class="number">{{ estadisticas.productos_bajo_minimo|default:"0" }}</div>
+            <div class="subtitle">Requiere reposición</div>
+        </div>
+        <div class="stat-card success" onclick="verDetalleEstadistica('valor_inventario')">
+            <h3>Valor Total Inventario</h3>
+            <div class="number">{{ valoracion.total_items|floatformat:"-2"|default:"0" }}</div>
+            <div class="subtitle">Unidades valoradas</div>
+        </div>
+    </div>
+    
+    <!-- Filtros Mejorados -->
+    <div class="filters-container">
+        <form method="get" action="" id="filterForm">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="vista">{% trans "Vista" %}:</label>
+                    <select name="vista" id="vista">
+                        <option value="detallado" {% if filtros.vista == 'detallado' %}selected{% endif %}>📋 Detallado por Almacén y Producto</option>
+                        <option value="por_almacen" {% if filtros.vista == 'por_almacen' %}selected{% endif %}>🏢 Consolidado por Almacén</option>
+                        <option value="por_producto" {% if filtros.vista == 'por_producto' %}selected{% endif %}>📦 Consolidado por Producto</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="almacen">{% trans "Almacén" %}:</label>
+                    <select name="almacen" id="almacen">
+                        <option value="">🏬 Todos los Almacenes</option>
+                        {% for almacen in almacenes %}
+                        <option value="{{ almacen.id }}" {% if filtros.almacen == almacen.id|stringformat:"s" %}selected{% endif %}>
+                            {{ almacen.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="categoria">{% trans "Categoría" %}:</label>
+                    <select name="categoria" id="categoria">
+                        <option value="">📂 Todas las Categorías</option>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id }}" {% if filtros.categoria == categoria.id|stringformat:"s" %}selected{% endif %}>
+                            {{ categoria.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="producto">{% trans "Producto" %}:</label>
+                    <select name="producto" id="producto">
+                        <option value="">📦 Todos los Productos</option>
+                        {% for producto in productos %}
+                        <option value="{{ producto.id }}" {% if filtros.producto == producto.id|stringformat:"s" %}selected{% endif %}>
+                            {{ producto.codigo }} - {{ producto.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>{% trans "Filtros Especiales" %}:</label>
+                    <div class="filter-checkbox-group">
+                        <input type="checkbox" name="stock_minimo" id="stock_minimo" value="1" {% if filtros.stock_minimo %}checked{% endif %}>
+                        <label for="stock_minimo">⚠️ Solo productos bajo stock mínimo</label>
+                    </div>
+                    <div class="filter-checkbox-group">
+                        <input type="checkbox" name="solo_con_stock" id="solo_con_stock" value="1" {% if filtros.solo_con_stock %}checked{% endif %}>
+                        <label for="solo_con_stock">✅ Solo con stock disponible</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    Filtrar
+                </button>
+                <a href="?" class="btn btn-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Limpiar Filtros
+                </a>
+                <a href="exportar-excel/?{{ request.GET.urlencode }}" class="btn btn-success">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Exportar Excel
+                </a>
+                <a href="exportar-csv/?{{ request.GET.urlencode }}" class="btn btn-success">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Exportar CSV
+            </a>
+        </div>
+    </form>
+</div>
+
+{% if stocks %}
+<div class="pagination-controls-top" style="margin: 0 0 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+    
+    <div class="items-per-page" style="display: flex; align-items: center; gap: 10px;">
+        <label for="items-select" style="font-weight: 600; color: #495057;">Mostrar:</label>
+        <select id="items-select" onchange="changeItemsPerPage(this.value)" 
+                style="padding: 5px 10px; height: 35px; border: 2px solid #ced4da; border-radius: 4px; font-size: 14px; background: white; cursor: pointer; line-height: 1.5;">
+            <option value="50" {% if items_por_pagina == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if items_por_pagina == 100 %}selected{% endif %}>100</option>
+            <option value="200" {% if items_por_pagina == 200 %}selected{% endif %}>200</option>
+            <option value="500" {% if items_por_pagina == 500 %}selected{% endif %}>500</option>
+        </select>
+        <span style="color: #6c757d; font-size: 14px;">registros por página</span>
+    </div>
+    
+    <div class="page-info" style="color: #495057; font-weight: 600; font-size: 14px; background: white; padding: 8px 16px; border-radius: 4px; border: 2px solid #e9ecef;">
+        📊 Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+    </div>
+    
+    <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+        {% if page_obj.has_previous %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⏮️ Primera</a>
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⬅️ Anterior</a>
+        {% else %}
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+        {% endif %}
+        
+        <span style="padding: 8px 14px; background: #27ae60; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+            📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Siguiente ➡️</a>
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Última ⏭️</a>
+        {% else %}
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Tabla de Resultados -->
+<div class="table-container">
+    <h2>
+        {% if filtros.vista == 'detallado' %}
+            📋 Stock Detallado por Almacén y Producto
+        {% elif filtros.vista == 'por_almacen' %}
+            🏢 Stock Consolidado por Almacén
+        {% else %}
+            📦 Stock Consolidado por Producto
+        {% endif %}
+    </h2>
+    
+    {% if stocks %}
+    <table class="stock-table">
+        {% if filtros.vista == 'detallado' %}
+        <thead>
+            <tr>
+                <th>ALMACÉN</th>
+                <th>CÓDIGO</th>
+                <th>PRODUCTO</th>
+                <th>CATEGORÍA</th>
+                <th>UNIDAD</th>
+                <th class="text-right">ENTRADAS</th>
+                <th class="text-right">SALIDAS</th>
+                <th class="text-right">TRASLADOS</th>
+                <th class="text-right">STOCK BUENO</th>
+                <th class="text-right">STOCK DAÑADO</th>
+                <th class="text-right">STOCK TOTAL</th>
+                <th>ACCIONES</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock in stocks %}
+            <tr>
+                <td><span class="almacen-badge">{{ stock.almacen.nombre }}</span></td>
+                <td><span class="codigo-badge">{{ stock.producto.codigo }}</span></td>
+                <td><strong>{{ stock.producto.nombre }}</strong></td>
+                <td>{{ stock.producto.categoria.nombre|default:"-" }}</td>
+                <td>{{ stock.producto.unidad_medida.abreviatura }}</td>
+                <td class="text-right">{{ stock.entradas_total|floatformat:2 }}</td>
+                <td class="text-right">{{ stock.salidas_total|floatformat:2 }}</td>
+                <td class="text-right">{{ stock.traslados_netos|floatformat:2 }}</td>
+                <td class="text-right stock-bueno">{{ stock.stock_bueno|floatformat:2 }}</td>
+                <td class="text-right stock-danado">{{ stock.stock_danado|floatformat:2 }}</td>
+                <td class="text-right"><span class="stock-total">{{ stock.stock_total|floatformat:2 }}</span></td>
+                <td>
+                    <button class="btn-ver-detalle" onclick="verDetalleStock('{{ stock.producto.id }}', '{{ stock.almacen.id }}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        Ver Detalle
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        
+        {% elif filtros.vista == 'por_almacen' %}
+        <thead>
+            <tr>
+                <th>ALMACÉN</th>
+                <th class="text-right">TOTAL PRODUCTOS</th>
+                <th class="text-right">STOCK BUENO</th>
+                <th class="text-right">STOCK DAÑADO</th>
+                <th class="text-right">STOCK TOTAL</th>
+                <th>ACCIONES</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock in stocks %}
+            <tr>
+                <td><span class="almacen-badge">{{ stock.almacen.nombre }}</span></td>
+                <td class="text-right">{{ stock.total_productos }}</td>
+                <td class="text-right stock-bueno">{{ stock.stock_buena_total|floatformat:2 }}</td>
+                <td class="text-right stock-danado">{{ stock.stock_danada_total|floatformat:2 }}</td>
+                <td class="text-right"><span class="stock-total">{{ stock.stock_total|floatformat:2 }}</span></td>
+                <td>
+                    <button class="btn-ver-detalle" onclick="verDetalleAlmacen('{{ stock.almacen.id }}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                        </svg>
+                        Ver Productos
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        
+        {% else %}
+        <thead>
+            <tr>
+                <th>CÓDIGO</th>
+                <th>PRODUCTO</th>
+                <th>CATEGORÍA</th>
+                <th>UNIDAD</th>
+                <th class="text-right">ALMACENES</th>
+                <th class="text-right">STOCK BUENO</th>
+                <th class="text-right">STOCK DAÑADO</th>
+                <th class="text-right">STOCK TOTAL</th>
+                <th>ACCIONES</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stock in stocks %}
+            <tr>
+                <td><span class="codigo-badge">{{ stock.producto.codigo }}</span></td>
+                <td><strong>{{ stock.producto.nombre }}</strong></td>
+                <td>{{ stock.producto.categoria.nombre|default:"-" }}</td>
+                <td>{{ stock.producto.unidad_medida.abreviatura|default:"UND" }}</td>
+                <td class="text-right">{{ stock.total_almacenes }}</td>
+                <td class="text-right stock-bueno">{{ stock.stock_buena_total|floatformat:2 }}</td>
+                <td class="text-right stock-danado">{{ stock.stock_danada_total|floatformat:2 }}</td>
+                <td class="text-right"><span class="stock-total">{{ stock.stock_total|floatformat:2 }}</span></td>
+                <td>
+                    <button class="btn-ver-detalle" onclick="verDetalleProducto('{{ stock.producto.id }}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        Ver Almacenes
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% endif %}
+    </table>
+
+    <div class="pagination-controls-bottom" style="margin: 20px 0 0 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-top: 3px solid #667eea;">
+        <div class="page-info" style="color: #495057; font-weight: 600; font-size: 14px; background: white; padding: 8px 16px; border-radius: 4px; border: 2px solid #e9ecef;">
+            📊 Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+        </div>
+        
+        <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+            {% if page_obj.has_previous %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+                style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</a>
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+                style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</a>
+            {% else %}
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+            {% endif %}
+            
+            <span style="padding: 8px 14px; background: #27ae60; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+                📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+            </span>
+            
+            {% if page_obj.has_next %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+                style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</a>
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+                style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</a>
+            {% else %}
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="no-data">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#95a5a6" stroke-width="2" style="margin-bottom: 15px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p><strong>No hay datos que mostrar con los filtros seleccionados</strong></p>
+        <p style="font-size: 14px; margin-top: 10px;">Intenta ajustar los filtros o limpiar la búsqueda</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Resúmenes Laterales -->
+{% if resumen_almacenes or valoracion %}
+<div class="summaries-grid">
+    <!-- Resumen por Almacén -->
+    {% if resumen_almacenes %}
+    <div class="sidebar-summary">
+        <h3>📦 Resumen por Almacén</h3>
+        {% for item in resumen_almacenes %}
+        <div class="summary-item">
+            <strong>{{ item.almacen }}</strong>
+            <div class="details">
+                Productos: <span class="value">{{ item.total_productos }}</span> | 
+                Stock Total: <span class="value">{{ item.stock_total|floatformat:2 }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Valoración Total -->
+    {% if valoracion %}
+    <div class="sidebar-summary">
+        <h3>💰 Valoración del Inventario</h3>
+        <div class="summary-item">
+            <strong>Total de Productos Diferentes</strong>
+            <div class="details">
+                <span class="value">{{ valoracion.total_productos }}</span> productos únicos
+            </div>
+        </div>
+        <div class="summary-item">
+            <strong>Total de Items en Stock</strong>
+            <div class="details">
+                <span class="value">{{ valoracion.total_items|floatformat:2 }}</span> unidades
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Modal para Detalles -->
+<div id="modal-detalle" class="stock-modal" style="display: none;">
+    <div class="modal-overlay" onclick="cerrarModalDetalle()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="detalle-titulo">Detalle</h3>
+            <button class="modal-close" onclick="cerrarModalDetalle()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="detalle-contenido">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-info" onclick="cerrarModalDetalle()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+<script>
+
+function verDetalleEstadistica(tipo) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Cargando detalles...';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando información detallada...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    fetch(`obtener-detalle-estadistica/?tipo=${tipo}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '';
+                
+                if (tipo === 'total_productos') {
+                    titulo.textContent = '📦 Detalle: Total de Productos';
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📊 Resumen General</h4>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Total de Productos Únicos:</span><span class="detalle-value">' + data.total_productos + '</span></div>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Productos con Stock Positivo:</span><span class="detalle-value cantidad-buena">' + data.productos_con_stock + '</span></div>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Productos sin Stock:</span><span class="detalle-value" style="color: #95a5a6;">' + data.productos_sin_stock + '</span></div>';
+                    
+                    // ✅ NUEVO: Advertencia de productos con stock negativo
+                    if (data.productos_con_stock_negativo > 0) {
+                        html += '<div class="detalle-item" style="background: #fff3cd; border-left: 4px solid #f39c12; padding: 10px; margin-top: 10px;">';
+                        html += '<span class="detalle-label">⚠️ Productos con Stock NEGATIVO:</span>';
+                        html += '<span class="detalle-value cantidad-danada">' + data.productos_con_stock_negativo + '</span>';
+                        html += '</div>';
+                        html += '<div style="padding: 10px; background: #ffe5e5; border-radius: 4px; margin-top: 5px; font-size: 12px; color: #c0392b;">';
+                        html += '⚠️ <strong>ADVERTENCIA:</strong> Hay productos con stock negativo. Esto indica más salidas que entradas.';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    
+                    if (data.por_categoria && data.por_categoria.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📂 Distribución por Categoría</h4>';
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        data.por_categoria.forEach(function(cat) {
+                            var porcentaje = ((cat.total / data.total_productos) * 100).toFixed(1);
+                            html += '<div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #667eea;">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            html += '<strong style="color: #2c3e50; font-size: 14px;">' + cat.categoria + '</strong>';
+                            html += '<span style="background: #667eea; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">' + cat.total + ' productos</span>';
+                            html += '</div>';
+                            html += '<div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">';
+                            html += '<div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: ' + porcentaje + '%; transition: width 0.3s ease;"></div>';
+                            html += '</div>';
+                            html += '<div style="text-align: right; font-size: 12px; color: #546e7a; margin-top: 5px;">' + porcentaje + '%</div>';
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    }
+                    
+                } else if (tipo === 'stock_bueno') {
+                    titulo.textContent = '✅ Detalle: Stock en Buen Estado';
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📊 Resumen de Stock Bueno</h4>';
+                    
+                    // ✅ Mostrar con color según signo
+                    var totalStockBueno = parseFloat(data.total_stock_bueno);
+                    var colorTotal = totalStockBueno >= 0 ? '#27ae60' : '#e74c3c';
+                    var signoTotal = totalStockBueno < 0 ? '⚠️ ' : '';
+                    
+                    html += '<div class="detalle-item"><span class="detalle-label">Total Unidades en Buen Estado:</span>';
+                    html += '<span class="detalle-value" style="color: ' + colorTotal + ';">' + signoTotal + totalStockBueno.toFixed(2) + '</span></div>';
+                    
+                    html += '<div class="detalle-item"><span class="detalle-label">Productos con Stock Positivo:</span><span class="detalle-value">' + data.productos_con_stock_bueno + '</span></div>';
+                    
+                    // ✅ NUEVO: Advertencia
+                    if (data.productos_con_stock_bueno_negativo > 0) {
+                        html += '<div class="detalle-item" style="background: #fff3cd; border-left: 4px solid #f39c12; padding: 10px; margin-top: 10px;">';
+                        html += '<span class="detalle-label">⚠️ Productos con Stock Bueno NEGATIVO:</span>';
+                        html += '<span class="detalle-value cantidad-danada">' + data.productos_con_stock_bueno_negativo + '</span>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    
+                    if (data.por_almacen && data.por_almacen.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>🏢 Distribución por Almacén</h4>';
+                        
+                        // ✅ Advertencia general
+                        var hayNegativos = data.por_almacen.some(alm => alm.es_negativo);
+                        if (hayNegativos) {
+                            html += '<div style="padding: 10px; background: #ffe5e5; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #c0392b; border-left: 4px solid #e74c3c;">';
+                            html += '⚠️ <strong>ADVERTENCIA:</strong> Algunos almacenes muestran stock negativo.';
+                            html += '</div>';
+                        }
+                        
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        data.por_almacen.forEach(function(alm) {
+                            var stockValue = parseFloat(alm.stock_bueno);
+                            var porcentaje = data.total_stock_bueno > 0 ? ((Math.abs(stockValue) / Math.abs(data.total_stock_bueno)) * 100).toFixed(1) : 0;
+                            
+                            var bgColor = '#e8f5e9';
+                            var borderColor = '#27ae60';
+                            var textColor = '#1b5e20';
+                            var icono = '';
+                            
+                            // ✅ Estilos según el valor
+                            if (alm.es_negativo) {
+                                bgColor = '#ffe5e5';
+                                borderColor = '#e74c3c';
+                                textColor = '#c62828';
+                                icono = '⚠️ ';
+                            } else if (alm.es_cero) {
+                                bgColor = '#f8f9fa';
+                                borderColor = '#95a5a6';
+                                textColor = '#546e7a';
+                                icono = '⚪ ';
+                            }
+                            
+                            html += '<div style="background: ' + bgColor + '; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ' + borderColor + ';">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            html += '<strong style="color: ' + textColor + '; font-size: 14px;">' + icono + alm.almacen + '</strong>';
+                            html += '<span style="background: ' + borderColor + '; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">' + stockValue.toFixed(2) + ' unidades</span>';
+                            html += '</div>';
+                            
+                            if (!alm.es_cero) {
+                                html += '<div style="background: ' + (alm.es_negativo ? '#ffcdd2' : '#c8e6c9') + '; height: 8px; border-radius: 4px; overflow: hidden;">';
+                                html += '<div style="background: ' + borderColor + '; height: 100%; width: ' + porcentaje + '%; transition: width 0.3s ease;"></div>';
+                                html += '</div>';
+                                html += '<div style="text-align: right; font-size: 12px; color: ' + textColor + '; margin-top: 5px;">' + porcentaje + '%</div>';
+                            }
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    }
+                    
+                } else if (tipo === 'stock_danado') {
+                    titulo.textContent = '⚠️ Detalle: Stock Dañado';
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📊 Resumen de Stock Dañado</h4>';
+                    
+                    var totalStockDanado = parseFloat(data.total_stock_danado);
+                    var colorTotal = totalStockDanado >= 0 ? '#e74c3c' : '#c0392b';
+                    var signoTotal = totalStockDanado < 0 ? '⚠️ ' : '';
+                    
+                    html += '<div class="detalle-item"><span class="detalle-label">Total Unidades Dañadas:</span>';
+                    html += '<span class="detalle-value" style="color: ' + colorTotal + ';">' + signoTotal + totalStockDanado.toFixed(2) + '</span></div>';
+                    
+                    html += '<div class="detalle-item"><span class="detalle-label">Productos Afectados:</span><span class="detalle-value">' + data.productos_con_stock_danado + '</span></div>';
+                    
+                    if (data.productos_con_stock_danado_negativo > 0) {
+                        html += '<div class="detalle-item" style="background: #fff3cd; padding: 10px; margin-top: 10px;">';
+                        html += '<span class="detalle-label">⚠️ Productos con Stock Dañado NEGATIVO:</span>';
+                        html += '<span class="detalle-value">' + data.productos_con_stock_danado_negativo + '</span>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    
+                    if (data.por_almacen && data.por_almacen.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>🏢 Distribución por Almacén</h4>';
+                        
+                        var hayNegativos = data.por_almacen.some(alm => alm.es_negativo);
+                        if (hayNegativos) {
+                            html += '<div style="padding: 10px; background: #ffe5e5; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #c0392b; border-left: 4px solid #e74c3c;">';
+                            html += '⚠️ <strong>ADVERTENCIA:</strong> Stock dañado negativo indica más salidas que entradas.';
+                            html += '</div>';
+                        }
+                        
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        data.por_almacen.forEach(function(alm) {
+                            var stockValue = parseFloat(alm.stock_danado);
+                            var porcentaje = data.total_stock_danado > 0 ? ((Math.abs(stockValue) / Math.abs(data.total_stock_danado)) * 100).toFixed(1) : 0;
+                            
+                            var bgColor = '#ffebee';
+                            var borderColor = '#e74c3c';
+                            var textColor = '#c62828';
+                            var icono = '';
+                            
+                            if (alm.es_negativo) {
+                                borderColor = '#c0392b';
+                                icono = '⚠️ ';
+                            } else if (alm.es_cero) {
+                                bgColor = '#f8f9fa';
+                                borderColor = '#95a5a6';
+                                textColor = '#546e7a';
+                                icono = '⚪ ';
+                            }
+                            
+                            html += '<div style="background: ' + bgColor + '; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ' + borderColor + ';">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            html += '<strong style="color: ' + textColor + '; font-size: 14px;">' + icono + alm.almacen + '</strong>';
+                            html += '<span style="background: ' + borderColor + '; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">' + stockValue.toFixed(2) + ' unidades</span>';
+                            html += '</div>';
+                            
+                            if (!alm.es_cero) {
+                                html += '<div style="background: #ffcdd2; height: 8px; border-radius: 4px; overflow: hidden;">';
+                                html += '<div style="background: ' + borderColor + '; height: 100%; width: ' + porcentaje + '%; transition: width 0.3s ease;"></div>';
+                                html += '</div>';
+                                html += '<div style="text-align: right; font-size: 12px; color: ' + textColor + '; margin-top: 5px;">' + porcentaje + '%</div>';
+                            }
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    }
+                    
+                    if (data.productos_mas_danados && data.productos_mas_danados.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>🔴 Productos Más Afectados</h4>';
+                        html += '<div style="max-height: 300px; overflow-y: auto;">';
+                        html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                        html += '<thead style="background: #2c3e50; color: white; position: sticky; top: 0;">';
+                        html += '<tr><th style="padding: 10px; text-align: left;">Producto</th><th style="padding: 10px; text-align: right;">Cantidad Dañada</th></tr>';
+                        html += '</thead><tbody>';
+                        data.productos_mas_danados.forEach(function(prod, idx) {
+                            var bg = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                            var stockValue = parseFloat(prod.stock_danado);
+                            var icono = prod.es_negativo ? '⚠️ ' : '';
+                            var color = prod.es_negativo ? '#c0392b' : '#e74c3c';
+                            
+                            html += '<tr style="background: ' + bg + ';"><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;"><strong>' + prod.producto + '</strong><br><small style="color: #7f8c8d;">' + prod.codigo + '</small></td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: ' + color + '; font-weight: 700;">' + icono + stockValue.toFixed(2) + '</td></tr>';
+                        });
+                        html += '</tbody></table></div></div>';
+                    }
+                }
+                
+                else if (tipo === 'total_almacenes') {
+                    titulo.textContent = '🏢 Detalle: Almacenes Activos';
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📊 Resumen de Ubicaciones</h4>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Total Almacenes:</span><span class="detalle-value">' + data.total_almacenes + '</span></div>';
+                    html += '</div>';
+
+                    if (data.almacenes && data.almacenes.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📋 Listado de Almacenes</h4>';
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        
+                        data.almacenes.forEach(function(alm) {
+                            html += '<div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #3498db;">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            html += '<strong style="color: #2c3e50; font-size: 14px;">' + alm.nombre + '</strong>';
+                            html += '<span style="background: #34495e; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 12px;">' + alm.total_productos + ' productos</span>';
+                            html += '</div>';
+                            
+                            html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 12px; text-align: center;">';
+                            html += '<div><span style="color: #27ae60; font-weight: 700;">' + parseFloat(alm.stock_bueno).toFixed(2) + '</span><br><span style="color: #7f8c8d;">Bueno</span></div>';
+                            html += '<div><span style="color: #e74c3c; font-weight: 700;">' + parseFloat(alm.stock_danado).toFixed(2) + '</span><br><span style="color: #7f8c8d;">Dañado</span></div>';
+                            html += '<div><span style="color: #3498db; font-weight: 700;">' + parseFloat(alm.stock_total).toFixed(2) + '</span><br><span style="color: #7f8c8d;">Total</span></div>';
+                            html += '</div>';
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    }
+
+                } else if (tipo === 'bajo_minimo') {
+                    titulo.textContent = '⚠️ Detalle: Bajo Stock Mínimo';
+                    html += '<div class="detalle-estadistica-card" style="border-left-color: #f39c12;">';
+                    html += '<h4>📊 Resumen de Alertas</h4>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Productos en Alerta:</span><span class="detalle-value" style="color: #d35400;">' + data.total_bajo_minimo + '</span></div>';
+                    html += '<p style="margin-top: 10px; font-size: 13px; color: #7f8c8d;">Estos productos tienen un stock actual inferior al mínimo configurado.</p>';
+                    html += '</div>';
+
+                    if (data.productos && data.productos.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>🔴 Productos Críticos</h4>';
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        
+                        data.productos.forEach(function(prod) {
+                            html += '<div style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #f39c12;">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">';
+                            html += '<div><strong style="color: #d35400;">' + prod.producto + '</strong><br><small style="color: #7f8c8d;">' + prod.codigo + ' | ' + prod.almacen + '</small></div>';
+                            html += '<span style="background: #e74c3c; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px;">Faltan ' + parseFloat(prod.diferencia).toFixed(2) + '</span>';
+                            html += '</div>';
+                            
+                            html += '<div style="display: flex; gap: 15px; font-size: 13px; margin-top: 5px;">';
+                            html += '<div>Actual: <strong style="color: #c0392b;">' + parseFloat(prod.stock_actual).toFixed(2) + '</strong></div>';
+                            html += '<div>Mínimo: <strong>' + parseFloat(prod.stock_minimo).toFixed(2) + '</strong></div>';
+                            html += '</div>';
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    } else {
+                        html += '<div class="detalle-estadistica-card"><p style="text-align: center; color: #27ae60; padding: 20px;">✅ ¡Excelente! No hay productos bajo el stock mínimo.</p></div>';
+                    }
+
+                } else if (tipo === 'valor_inventario') {
+                    titulo.textContent = '💰 Detalle: Valoración de Inventario';
+                    html += '<div class="detalle-estadistica-card" style="border-left-color: #27ae60;">';
+                    html += '<h4>📊 Volumen Total</h4>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Unidades Totales:</span><span class="detalle-value" style="color: #27ae60;">' + parseFloat(data.total_items).toFixed(2) + '</span></div>';
+                    html += '<div class="detalle-item"><span class="detalle-label">Referencias Únicas:</span><span class="detalle-value">' + data.total_productos + '</span></div>';
+                    html += '</div>';
+
+                    if (data.por_categoria && data.por_categoria.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📂 Volumen por Categoría</h4>';
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        
+                        data.por_categoria.forEach(function(cat) {
+                            var porcentaje = data.total_items > 0 ? ((cat.total_items / data.total_items) * 100).toFixed(1) : 0;
+                            
+                            html += '<div style="background: #e8f5e9; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #27ae60;">';
+                            html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            html += '<strong style="color: #1b5e20; font-size: 14px;">' + cat.categoria + '</strong>';
+                            html += '<span style="background: #27ae60; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 13px;">' + parseFloat(cat.total_items).toFixed(2) + ' unid.</span>';
+                            html += '</div>';
+                            
+                            html += '<div style="background: #c8e6c9; height: 8px; border-radius: 4px; overflow: hidden;">';
+                            html += '<div style="background: #2e7d32; height: 100%; width: ' + porcentaje + '%; transition: width 0.3s ease;"></div>';
+                            html += '</div>';
+                            html += '<div style="text-align: right; font-size: 12px; color: #1b5e20; margin-top: 5px;">Representa el ' + porcentaje + '% del inventario</div>';
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                    }
+                }
+
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles.</p></div>';
+        });
+}
+
+function verDetalleStock(productoId, almacenId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Detalle de Stock - Producto y Almacén';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando información detallada...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // ✅ USAR URL RELATIVA CORRECTA
+    fetch(`obtener-detalle-stock/?producto_id=${productoId}&almacen_id=${almacenId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>📦 ' + data.producto.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.producto.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Categoría:</span><span class="detalle-value">' + (data.producto.categoria || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Almacén:</span><span class="detalle-value">' + data.almacen.nombre + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Unidad:</span><span class="detalle-value">' + data.producto.unidad + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📊 Resumen de Stock</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Total Entradas:</span><span class="detalle-value" style="color: #27ae60;">+' + parseFloat(data.resumen.total_entradas).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Total Salidas:</span><span class="detalle-value" style="color: #e74c3c;">-' + parseFloat(data.resumen.total_salidas).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Traslados Recibidos:</span><span class="detalle-value" style="color: #3498db;">+' + parseFloat(data.resumen.traslados_recibidos).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Traslados Enviados:</span><span class="detalle-value" style="color: #e67e22;">-' + parseFloat(data.resumen.traslados_enviados).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Stock Bueno:</span><span class="detalle-value cantidad-buena">' + parseFloat(data.resumen.stock_bueno).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Stock Dañado:</span><span class="detalle-value cantidad-danada">' + parseFloat(data.resumen.stock_danado).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item" style="border-top: 2px solid #667eea; margin-top: 10px; padding-top: 10px;"><span class="detalle-label" style="font-size: 16px;">STOCK TOTAL:</span><span class="detalle-value" style="font-size: 18px; color: #667eea;">' + parseFloat(data.resumen.stock_total).toFixed(2) + '</span></div>';
+                html += '</div>';
+                
+                if (data.movimientos && data.movimientos.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📋 Movimientos</h4>';
+                    html += '<div style="max-height: 400px; overflow-y: auto;">';
+                    
+                    data.movimientos.forEach(function(mov) {
+                        var tipoColor = '#3498db';
+                        var tipoIcon = '📦';
+                        
+                        if (mov.tipo.includes('Entrada')) {
+                            tipoColor = '#27ae60';
+                            tipoIcon = '⬇️';
+                        } else if (mov.tipo.includes('Salida')) {
+                            tipoColor = '#e74c3c';
+                            tipoIcon = '⬆️';
+                        } else if (mov.tipo.includes('Traslado')) {
+                            tipoColor = '#3498db';
+                            tipoIcon = '🔄';
+                        }
+                        
+                        html += '<div class="movimiento-mini" style="border-left: 3px solid ' + tipoColor + ';">';
+                        
+                        // Número de movimiento
+                        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">';
+                        html += '<span style="font-size: 11px; color: #95a5a6; text-transform: uppercase; letter-spacing: 0.5px;">N° Movimiento</span>';
+                        html += '<span style="font-weight: 700; color: #2c3e50; font-size: 13px;">' + mov.numero_movimiento + '</span>';
+                        html += '</div>';
+                        
+                        // Tipo y fecha
+                        html += '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">';
+                        html += '<span style="font-weight: 700; color: ' + tipoColor + '; font-size: 14px;">' + tipoIcon + ' ' + mov.tipo + '</span>';
+                        html += '<span style="font-size: 12px; color: #7f8c8d;">' + mov.fecha + '</span>';
+                        html += '</div>';
+                        
+                        // ✅ MOSTRAR ALMACENES PARA TRASLADOS
+                        if (mov.tipo && mov.tipo.includes('Traslado')) {
+                            html += '<div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #3498db;">';
+                            
+                            if (mov.almacen_origen) {
+                                html += '<div style="margin-bottom: 5px;">';
+                                html += '<strong style="color: #e67e22;">📤 Almacén Origen:</strong> ';
+                                html += '<span style="color: #2c3e50; font-weight: 600;">' + mov.almacen_origen + '</span>';
+                                html += '</div>';
+                            }
+                            
+                            if (mov.almacen_destino) {
+                                html += '<div>';
+                                html += '<strong style="color: #27ae60;">📥 Almacén Destino:</strong> ';
+                                html += '<span style="color: #2c3e50; font-weight: 600;">' + mov.almacen_destino + '</span>';
+                                html += '</div>';
+                            }
+                            
+                            html += '</div>';
+                        }
+                        
+                        // Detalles de cantidad
+                        html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">';
+                        html += '<div><strong>Cantidad:</strong> ' + parseFloat(mov.cantidad).toFixed(2) + '</div>';
+                        html += '<div><strong>Estado:</strong> ' + mov.estado + '</div>';
+                        
+                        if (mov.cantidad_buena && parseFloat(mov.cantidad_buena) > 0) {
+                            html += '<div><strong>Buena:</strong> <span style="color: #27ae60; font-weight: 700;">' + parseFloat(mov.cantidad_buena).toFixed(2) + '</span></div>';
+                        }
+                        if (mov.cantidad_danada && parseFloat(mov.cantidad_danada) > 0) {
+                            html += '<div><strong>Dañada:</strong> <span style="color: #e74c3c; font-weight: 700;">' + parseFloat(mov.cantidad_danada).toFixed(2) + '</span></div>';
+                        }
+                        
+                        if (mov.proveedor) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Proveedor:</strong> ' + mov.proveedor + '</div>';
+                        }
+                        
+                        if (mov.recepcionista) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Recepcionista:</strong> ' + mov.recepcionista + '</div>';
+                        }
+                        
+                        html += '</div></div>';
+                    });
+                    
+                    html += '</div></div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay movimientos registrados</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function verDetalleAlmacen(almacenId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Productos del Almacén';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">Cargando productos del almacén...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Hacer petición AJAX para obtener los productos del almacén
+    fetch(`/reportes/obtener-detalle-almacen/?almacen_id=${almacenId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>🏢 ' + data.almacen.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Total de Productos Ingresados:</span><span class="detalle-value">' + data.total_productos + '</span></div>';
+                html += '</div>';
+                
+                if (data.productos && data.productos.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📦 Listado de Productos</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    // Crear tabla de productos
+                    html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                    html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                    html += '<tr>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Código</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Producto</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Categoría</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Unidad</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Bueno</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Dañado</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Total</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Acciones</th>';
+                    html += '</tr>';
+                    html += '</thead>';
+                    html += '<tbody>';
+                    
+                    data.productos.forEach(function(prod, index) {
+                        var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                        html += '<tr style="background: ' + bgColor + ';">';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;"><span style="background: #667eea; color: white; padding: 4px 8px; border-radius: 3px; font-weight: 700; font-size: 11px;">' + prod.codigo + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">' + prod.nombre + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;">' + prod.categoria + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + prod.unidad + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #27ae60; font-weight: 700;">' + parseFloat(prod.stock_bueno).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #e74c3c; font-weight: 700;">' + parseFloat(prod.stock_danado).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: 700; color: #3498db;">' + parseFloat(prod.stock_total).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">';
+                        html += '<button onclick="verDetalleStock(\'' + prod.producto_id + '\', \'' + data.almacen.id + '\')" style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📊 Ver Detalle</button>';
+                        html += '</td>';
+                        html += '</tr>';
+                        
+                        // Fila expandible con más detalles (oculta por defecto)
+                        html += '<tr id="detalle-expandido-' + prod.producto_id + '" style="display: none; background: #e3f2fd;">';
+                        html += '<td colspan="8" style="padding: 15px; border: 1px solid #ddd;">';
+                        html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">';
+                        
+                        html += '<div>';
+                        html += '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 13px;">📊 Resumen de Movimientos</h5>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #27ae60;">';
+                        html += '<strong>Total Entradas:</strong> <span style="color: #27ae60; font-weight: 700;">' + parseFloat(prod.total_entradas).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #e74c3c; margin-top: 8px;">';
+                        html += '<strong>Total Salidas:</strong> <span style="color: #e74c3c; font-weight: 700;">' + parseFloat(prod.total_salidas).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '</div>';
+                        
+                        html += '<div>';
+                        html += '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 13px;">🔄 Traslados</h5>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #3498db;">';
+                        html += '<strong>Recibidos:</strong> <span style="color: #3498db; font-weight: 700;">' + parseFloat(prod.total_traslados_recibidos).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #e67e22; margin-top: 8px;">';
+                        html += '<strong>Enviados:</strong> <span style="color: #e67e22; font-weight: 700;">' + parseFloat(prod.total_traslados_enviados).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '</div>';
+                        
+                        html += '</div>';
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody>';
+                    html += '</table>';
+                    html += '</div>';
+                    
+                    // Resumen final
+                    var total_stock_bueno = 0;
+                    var total_stock_danado = 0;
+                    var total_stock_general = 0;
+                    
+                    data.productos.forEach(function(prod) {
+                        total_stock_bueno += parseFloat(prod.stock_bueno);
+                        total_stock_danado += parseFloat(prod.stock_danado);
+                        total_stock_general += parseFloat(prod.stock_total);
+                    });
+                    
+                    html += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white;">';
+                    html += '<h5 style="margin: 0 0 10px 0; font-size: 14px;">📈 Resumen General del Almacén</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Bueno</div><div style="font-size: 20px; font-weight: 700;">' + total_stock_bueno.toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Dañado</div><div style="font-size: 20px; font-weight: 700;">' + total_stock_danado.toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Total</div><div style="font-size: 20px; font-weight: 700;">' + total_stock_general.toFixed(2) + '</div></div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay productos con stock en este almacén</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los productos: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los productos. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function verDetalleProducto(productoId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Distribución del Producto en Almacenes';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">Cargando distribución por almacén...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Hacer petición AJAX para obtener la distribución del producto
+    fetch(`/reportes/obtener-detalle-producto-almacenes/?producto_id=${productoId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>📦 ' + data.producto.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.producto.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Categoría:</span><span class="detalle-value">' + data.producto.categoria + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Unidad:</span><span class="detalle-value">' + data.producto.unidad + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Almacenes con Stock:</span><span class="detalle-value">' + data.total_almacenes + '</span></div>';
+                html += '</div>';
+                
+                if (data.almacenes && data.almacenes.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>🏢 Distribución por Almacén</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    // Crear tabla de almacenes
+                    html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                    html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                    html += '<tr>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Almacén</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Bueno</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Dañado</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Stock Total</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Acciones</th>';
+                    html += '</tr>';
+                    html += '</thead>';
+                    html += '<tbody>';
+                    
+                    data.almacenes.forEach(function(alm, index) {
+                        var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                        html += '<tr style="background: ' + bgColor + ';">';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;"><span style="background: #34495e; color: white; padding: 5px 12px; border-radius: 4px; font-weight: 600; font-size: 13px;">' + alm.almacen_nombre + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #27ae60; font-weight: 700;">' + parseFloat(alm.stock_bueno).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #e74c3c; font-weight: 700;">' + parseFloat(alm.stock_danado).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: 700; color: #3498db;">' + parseFloat(alm.stock_total).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">';
+                        html += '<button onclick="verDetalleStock(\'' + data.producto.id + '\', \'' + alm.almacen_id + '\')" style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📊 Ver Detalle</button>';
+                        html += '</td>';
+                        html += '</tr>';
+                        
+                        // Fila expandible con más detalles
+                        html += '<tr id="detalle-expandido-alm-' + alm.almacen_id + '" style="display: none; background: #e3f2fd;">';
+                        html += '<td colspan="5" style="padding: 15px; border: 1px solid #ddd;">';
+                        html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">';
+                        
+                        html += '<div>';
+                        html += '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 13px;">📊 Resumen de Movimientos</h5>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #27ae60;">';
+                        html += '<strong>Total Entradas:</strong> <span style="color: #27ae60; font-weight: 700;">' + parseFloat(alm.total_entradas).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #e74c3c; margin-top: 8px;">';
+                        html += '<strong>Total Salidas:</strong> <span style="color: #e74c3c; font-weight: 700;">' + parseFloat(alm.total_salidas).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '</div>';
+                        
+                        html += '<div>';
+                        html += '<h5 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 13px;">🔄 Traslados</h5>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #3498db;">';
+                        html += '<strong>Recibidos:</strong> <span style="color: #3498db; font-weight: 700;">' + parseFloat(alm.total_traslados_recibidos).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '<div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #e67e22; margin-top: 8px;">';
+                        html += '<strong>Enviados:</strong> <span style="color: #e67e22; font-weight: 700;">' + parseFloat(alm.total_traslados_enviados).toFixed(2) + '</span>';
+                        html += '</div>';
+                        html += '</div>';
+                        
+                        html += '</div>';
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody>';
+                    html += '</table>';
+                    html += '</div>';
+                    
+                    // Resumen final con totales
+                    html += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white;">';
+                    html += '<h5 style="margin: 0 0 10px 0; font-size: 14px;">📈 Resumen General del Producto</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Almacenes</div><div style="font-size: 20px; font-weight: 700;">' + data.total_almacenes + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Bueno</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.stock_bueno).toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Dañado</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.stock_danado).toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Stock Total</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.stock_total).toFixed(2) + '</div></div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">Este producto no tiene stock en ningún almacén</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los almacenes: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los almacenes. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function cerrarModalDetalle() {
+    var modal = document.getElementById('modal-detalle');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// Cerrar modal con tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalDetalle();
+    }
+});
+
+// Auto-submit cuando cambia la vista
+document.getElementById('vista').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+});
+
+function changeItemsPerPage(value) {
+    const url = new URL(window.location);
+    url.searchParams.set('items_por_pagina', value);
+    url.searchParams.set('page', '1');  // Resetear a página 1
+    window.location = url.toString();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Efectos hover para botones de paginación
+    const paginationLinks = document.querySelectorAll('.pagination a[href]');
+    paginationLinks.forEach(link => {
+        link.addEventListener('mouseenter', function() {
+            this.style.background = '#5568d3';
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        });
+        link.addEventListener('mouseleave', function() {
+            this.style.background = '#667eea';
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+    });
+});
+
+
+</script>
+{% endblock %}

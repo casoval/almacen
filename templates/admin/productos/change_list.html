@@ -1,0 +1,116 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content_title %}
+    <h1>{{ title }}</h1>
+    
+    {% if show_import_export %}
+    <div class="import-export-buttons">
+        <a href="{% url 'admin:productos_producto_importar' %}" class="btn-import">
+            <i class="fas fa-file-import"></i>
+            <span>Importar desde Excel</span>
+        </a>
+        
+        <a href="{% url 'admin:productos_producto_exportar' %}" class="btn-export">
+            <i class="fas fa-file-export"></i>
+            <span>Exportar a Excel</span>
+        </a>
+    </div>
+    
+    <style>
+        /* Contenedor de botones */
+        .import-export-buttons {
+            margin: 20px 0;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        /* Estilo base para ambos botones */
+        .import-export-buttons a {
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .import-export-buttons a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .import-export-buttons a:active {
+            transform: translateY(0);
+        }
+        
+        /* Botón Importar - Azul */
+        .btn-import {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: #ffffff !important;
+        }
+        
+        .btn-import:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+        }
+        
+        /* Botón Exportar - Verde */
+        .btn-export {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: #ffffff !important;
+        }
+        
+        .btn-export:hover {
+            background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+        }
+        
+        /* Iconos */
+        .import-export-buttons i {
+            font-size: 16px;
+        }
+        
+        /* Asegurar texto blanco */
+        .import-export-buttons a,
+        .import-export-buttons a span,
+        .import-export-buttons a i {
+            color: #ffffff !important;
+        }
+        
+        /* Efecto de brillo al hover */
+        .import-export-buttons a::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .import-export-buttons a:hover::before {
+            left: 100%;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .import-export-buttons {
+                flex-direction: column;
+            }
+            
+            .import-export-buttons a {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,1527 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | CASOVAL{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <img src="{% static 'logo_casoval.png' %}" alt="Logo Casoval" class="admin-logo">
+        <div class="brand-text">
+            <span class="brand-title">INGENIERÍA & CONSTRUCCIÓN CASOVAL S.R.L.</span>
+            <span class="brand-subtitle">Sistema de Gestión de Almacenes</span>
+        </div>
+    </a>
+</div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block footer %}
+<div id="footer">
+    <div class="footer-content-with-user">
+        {% if not user.is_anonymous %}
+        <!-- INFO DE USUARIO A LA IZQUIERDA -->
+        <div class="user-info-card-footer">
+            <div class="user-avatar">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="user-details">
+                <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+                <div class="user-role">
+                    {% if user.is_superuser %}
+                        <i class="fas fa-crown"></i> Administrador
+                    {% elif user.is_staff %}
+                        <i class="fas fa-user-shield"></i> Personal
+                    {% else %}
+                        <i class="fas fa-user"></i> Usuario
+                    {% endif %}
+                </div>
+                <div class="user-email">
+                    <i class="fas fa-envelope"></i> {{ user.email|default:"Sin email" }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- INFO DE LA EMPRESA A LA DERECHA -->
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4><i class="fas fa-building"></i> INGENIERÍA & CONSTRUCCIÓN CASOVAL S.R.L.</h4>
+                <p><i class="fas fa-map-marker-alt"></i> Potosí - Bolivia</p>
+            </div>
+            <div class="footer-section">
+                <p><i class="fas fa-phone"></i> <a href="tel:+59169625434">69625434</a></p>
+                <p><i class="fas fa-envelope"></i> <a href="mailto:ingenieriayconstruccioncasoval@gmail.com">ingenieriayconstruccioncasoval@gmail.com</a></p>
+            </div>
+            <div class="footer-section">
+                <p><i class="fas fa-copyright"></i> {{ year|default:"2024" }} CASOVAL S.R.L.</p>
+                <p style="font-size: 0.85em; opacity: 0.8;">Todos los derechos reservados</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+
+    /* TARJETA DE USUARIO A LA IZQUIERDA - AVATAR AL LADO */
+    .user-info-card-footer {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 12px 18px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 18px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        height: auto;
+    }
+
+    .user-info-card-footer .user-avatar {
+        font-size: 3em;
+        color: #ffffff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        line-height: 1;
+        flex-shrink: 0;
+        width: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .user-info-card-footer .user-details {
+        flex: 1;
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .user-info-card-footer .user-name {
+        font-size: 1.15em;
+        font-weight: 700;
+        color: #ffffff !important;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        letter-spacing: 0.3px;
+        line-height: 1.2;
+    }
+
+    .user-info-card-footer .user-role {
+        font-size: 0.9em;
+        color: #ffd700 !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        line-height: 1.2;
+    }
+
+    .user-info-card-footer .user-role i {
+        color: #ffd700;
+        font-size: 0.95em;
+    }
+
+    .user-info-card-footer .user-email {
+        font-size: 0.8em;
+        color: #e0e0e0 !important;
+        font-weight: 400;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        line-height: 1.2;
+    }
+
+    .user-info-card-footer .user-email i {
+        color: #e67e22;
+        font-size: 1em;
+        flex-shrink: 0;
+    }
+
+    /* ===== HEADER PRINCIPAL ===== */
+    #header {
+        background: linear-gradient(135deg, #2a6eb0 0%, #3d5a80 100%);
+        border-bottom: 4px solid #e67e22;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 15px 20px;
+    }
+    
+    /* USUARIO Y LINKS DEL HEADER */
+    #header #user-tools,
+    #header #user-tools a {
+        color: #ffffff !important;
+        font-weight: 500;
+    }
+    
+    #header #user-tools a:hover {
+        color: #e67e22 !important;
+    }
+
+    /* ===== BOTÓN CAMBIO DE TEMA (SOL/LUNA) ===== */
+    #user-tools button,
+    button.theme-toggle,
+    #header button,
+    .theme-toggle {
+        background: rgba(255, 255, 255, 0.15) !important;
+        border: 2px solid rgba(255, 255, 255, 0.4) !important;
+        border-radius: 6px !important;
+        padding: 8px 10px !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 40px !important;
+        min-height: 36px !important;
+        position: relative !important;
+    }
+
+    #user-tools button:hover,
+    button.theme-toggle:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    }
+
+    /* Ocultar SVG original y mostrar icono Font Awesome */
+    #user-tools button svg,
+    button.theme-toggle svg,
+    .theme-toggle svg {
+        display: none !important;
+    }
+
+    /* Ocultar textos */
+    #user-tools button span,
+    button.theme-toggle span {
+        display: none !important;
+    }
+
+    /* Agregar icono con Font Awesome */
+    #user-tools button::before,
+    button.theme-toggle::before,
+    .theme-toggle::before {
+        content: "\f186" !important;
+        font-family: "Font Awesome 6 Free" !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        font-size: 18px !important;
+        display: block !important;
+    }
+
+    /* Cambiar icono en modo oscuro (opcional) */
+    [data-theme="dark"] #user-tools button::before,
+    [data-theme="dark"] button.theme-toggle::before {
+        content: "\f185" !important;
+    }
+    
+    /* ===== LOGO Y BRANDING ===== */
+    #site-name a {
+        color: #ffffff !important;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    #site-name a:hover {
+        transform: translateX(5px);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .admin-logo {
+        height: 70px;
+        width: auto;
+        filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        transition: transform 0.3s ease;
+    }
+    
+    #site-name a:hover .admin-logo {
+        transform: scale(1.05);
+    }
+    
+    .brand-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+    }
+    
+    .brand-title {
+        font-size: 1.5em;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: #ffffff !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .brand-subtitle {
+        font-size: 0.75em;
+        font-weight: 400;
+        color: #e0e0e0 !important;
+        letter-spacing: 1px;
+        margin-top: 2px;
+    }
+    
+    /* ===== NAVEGACIÓN Y SIDEBAR ===== */
+    #nav-sidebar {
+        background: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+    }
+    
+    #nav-sidebar .module {
+        background: #ffffff;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        overflow: hidden;
+        transition: box-shadow 0.3s ease;
+    }
+    
+    #nav-sidebar .module:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* TÍTULOS DE MÓDULOS CON ICONOS */
+    #nav-sidebar .module caption a {
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%);
+        color: #ffffff !important;
+        padding: 12px 15px;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 0.5px;
+        border-left: 4px solid #e67e22;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.4;
+    }
+    
+    /* FORZAR TEXTO BLANCO EN TODOS LOS TÍTULOS DE SIDEBAR */
+    #nav-sidebar .module caption,
+    #nav-sidebar .module caption a,
+    #nav-sidebar .module caption a span {
+        color: #ffffff !important;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    #nav-sidebar .module caption a:hover {
+        background: linear-gradient(135deg, #1a4070 0%, #2c4070 100%);
+        color: #ffffff !important;
+    }
+    
+    /* ICONOS PARA CADA MÓDULO */
+    .app-productos caption a::before { content: "\f49e"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-proveedores caption a::before { content: "\f0d1"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-recepcionistas caption a::before { content: "\f508"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-almacenes caption a::before { content: "\f494"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-beneficiarios caption a::before { content: "\f0c0"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-usuarios caption a::before { content: "\f007"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-reportes caption a::before { content: "\f1fe"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    .app-auth caption a::before { content: "\f023"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+    
+    /* MEJORAR VISUALIZACIÓN DE TÍTULOS LARGOS EN SIDEBAR */
+    #nav-sidebar .model-name {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        line-height: 1.3 !important;
+        max-width: 100% !important;
+    }
+    
+    #nav-sidebar th a {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        display: inline-block !important;
+        max-width: 100% !important;
+        line-height: 1.3 !important;
+        padding: 4px 0 !important;
+    }
+    
+    /* ===== ENLACES DEL SIDEBAR CON MEJOR CONTRASTE ===== */
+    #nav-sidebar a {
+        transition: all 0.2s ease;
+        color: #1a5490 !important;
+    }
+    
+    #nav-sidebar th a:hover {
+        color: #e67e22 !important;
+        background-color: #f0f7ff !important;
+    }
+    
+    /* ===== BOTONES AÑADIR EN SIDEBAR - DISCRETOS ===== */
+    #nav-sidebar .addlink {
+        background: #ededed !important;
+        color: #000000 !important;
+        padding: 6px 10px !important;
+        border-radius: 5px !important;
+        font-weight: 500 !important;
+        font-size: 0.8em !important;
+        text-align: center !important;
+        display: inline-block !important;
+        transition: all 0.2s ease !important;
+    }
+
+    #nav-sidebar .addlink:hover {
+        background: #4caf50 !important;
+        color: #ffffff !important;
+        transform: translateY(-1px) !important;
+    }
+
+    #nav-sidebar .addlink::before {
+        content: "+ " !important;
+        color: #ffffff !important;
+    }
+
+    /* ===== BOTONES AÑADIR EN CONTENIDO PRINCIPAL - TAMAÑO MODERADO ===== */
+    #content-main .addlink,
+    .object-tools .addlink,
+    .submit-row .addlink,
+    a.addlink:not(#nav-sidebar .addlink) {
+        background: linear-gradient(135deg, #e67e22 0%, #d35400 100%) !important;
+        color: #ffffff !important;
+        padding: 8px 16px !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        font-size: 0.9em !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.3px !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 4px rgba(230, 126, 34, 0.3) !important;
+        border: none !important;
+    }
+
+    #content-main .addlink:hover,
+    .object-tools .addlink:hover,
+    a.addlink:not(#nav-sidebar .addlink):hover {
+        background: linear-gradient(135deg, #d35400 0%, #c44900 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(230, 126, 34, 0.5) !important;
+        color: #ffffff !important;
+    }
+
+    #content-main .addlink::before,
+    .object-tools .addlink::before {
+        content: "➕ " !important;
+        font-size: 1em !important;
+        margin-right: 5px !important;
+    }
+
+    /* ===== CORREGIR TEXTOS AZULES QUE SE PIERDEN ===== */
+    #content-main tbody td a,
+    #content-main tbody th a {
+        color: #1a5490 !important;
+        font-weight: 600 !important;
+    }
+
+    #content-main tbody td a:hover,
+    #content-main tbody th a:hover {
+        color: #e67e22 !important;
+    }
+
+    #content-main .module ul li a,
+    #content-main ul.actionlist li a {
+        color: #2c3e50 !important;
+        font-weight: 500 !important;
+    }
+
+    #content-main .module ul li a:hover,
+    #content-main ul.actionlist li a:hover {
+        color: #e67e22 !important;
+    }
+
+    #content-main .row1 a,
+    #content-main .row2 a {
+        color: #1a5490 !important;
+        font-weight: 600 !important;
+    }
+
+    #content-main .changelink,
+    #content-main .viewlink {
+        color: #1a5490 !important;
+        font-weight: 600 !important;
+        padding: 6px 12px !important;
+        border-radius: 5px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    #content-main .changelink:hover,
+    #content-main .viewlink:hover {
+        background-color: #e8eef3 !important;
+        color: #e67e22 !important;
+    }
+
+    a[style*="color: #5b80b2"],
+    a[style*="color: #447e9b"] {
+        color: #1a5490 !important;
+    }
+
+    #nav-sidebar .changelink,
+    #nav-sidebar .viewlink {
+        color: #1a5490 !important;
+    }
+    
+    #nav-sidebar .changelink:hover,
+    #nav-sidebar .viewlink:hover {
+        background-color: #d1ecf1 !important;
+        color: #0c5460 !important;
+    }
+    
+    /* ===== BREADCRUMBS CON MEJOR CONTRASTE ===== */
+    .breadcrumbs {
+        background: linear-gradient(to right, #34495e, #2c3e50);
+        border-bottom: 2px solid #e67e22;
+        padding: 12px 20px;
+        font-size: 0.9em;
+    }
+    
+    .breadcrumbs,
+    .breadcrumbs a {
+        color: #ffffff !important;
+        font-weight: 600;
+        transition: color 0.2s ease;
+    }
+    
+    .breadcrumbs a:hover {
+        color: #e67e22 !important;
+        text-decoration: none;
+    }
+    
+    /* ===== BOTONES GENERALES ===== */
+    .button, input[type=submit], input[type=button], .submit-row input, button {
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%);
+        border: none;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        color: #ffffff !important;
+    }
+    
+    .button:hover, input[type=submit]:hover, input[type=button]:hover, .submit-row input:hover, button:hover {
+        background: linear-gradient(135deg, #1a4070 0%, #2c4070 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .button.default, input[type=submit].default, .submit-row input.default {
+        background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+    }
+    
+    .button.default:hover, input[type=submit].default:hover {
+        background: linear-gradient(135deg, #d35400 0%, #c44900 100%);
+    }
+    
+    /* ===== BOTONES ESPECÍFICOS CON TEXTO BLANCO - FUERZA MÁXIMA ===== */
+    
+    /* Botón BUSCAR */
+    input[type="submit"][value="Buscar"],
+    input[type="submit"][value="Search"] {
+        color: #ffffff !important;
+        background-color: #1a5490 !important;
+        background-image: none !important;
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%) !important;
+    }
+    
+    /* Botón IR (ejecutar acción) */
+    button.button[name="index"],
+    button[type="submit"].button,
+    .actions button.button {
+        color: #ffffff !important;
+        background-color: #1a5490 !important;
+        background-image: none !important;
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%) !important;
+    }
+    
+    /* Botón ELIMINAR - SIN FONDO ROJO, SOLO TEXTO BLANCO */
+    a.deletelink,
+    a[class*="deletelink"],
+    .deletelink-box a,
+    .deletelink-box a.deletelink,
+    p.deletelink-box a,
+    a[href*="/delete/"] {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    
+    a.deletelink:hover,
+    a[class*="deletelink"]:hover {
+        color: #ffffff !important;
+    }
+    
+    /* Botón CANCELAR - SIN FONDO GRIS, SOLO TEXTO BLANCO */
+    a.cancel-link,
+    a[class*="cancel"],
+    a.button.cancel-link,
+    .submit-row a.cancel-link,
+    a[href*="cancel"] {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    
+    a.cancel-link:hover,
+    a[class*="cancel"]:hover {
+        color: #ffffff !important;
+    }
+    
+    /* Botón HISTÓRICO */
+    a.historylink,
+    a[class*="historylink"] {
+        color: #ffffff !important;
+        background-color: #1a5490 !important;
+        background-image: none !important;
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%) !important;
+    }
+    
+    /* GUARDAR y otros botones submit con clase default */
+    input.default[type="submit"],
+    input[type="submit"].default {
+        color: #ffffff !important;
+        background-color: #28a745 !important;
+        background-image: none !important;
+        background: linear-gradient(135deg, #28a745 0%, #218838 100%) !important;
+    }
+    
+    /* NUCLEAR: Forzar en TODOS los enlaces que contengan "Eliminar" o "Cancelar" */
+    a[href*="/delete/"]:not(.addlink):not(.changelink),
+    a:contains("Eliminar"),
+    a:contains("Cancelar") {
+        color: #ffffff !important;
+    }
+    
+    /* SUPER FUERZA: Aplicar a TODOS los object-tools */
+    .object-tools a,
+    .object-tools li a,
+    ul.object-tools li a,
+    .object-tools a *,
+    .object-tools li a * {
+        color: #ffffff !important;
+    }
+    
+    /* SUPER FUERZA: Aplicar a TODOS los botones en submit-row */
+    .submit-row input,
+    .submit-row a,
+    .submit-row button,
+    .submit-row input *,
+    .submit-row a *,
+    .submit-row button * {
+        color: #ffffff !important;
+    }
+    
+    /* SUPER FUERZA: Aplicar a TODOS los botones en actions */
+    .actions button,
+    .actions input,
+    .actions button *,
+    .actions input * {
+        color: #ffffff !important;
+    }
+    
+    /* FUERZA ADICIONAL: Para enlaces dentro de párrafos con clase deletelink-box */
+    p[class*="deletelink"] a,
+    div[class*="deletelink"] a {
+        color: #ffffff !important;
+    }
+    
+
+        /* ===== BOTONES X DE ELIMINAR EN FORMSETS INLINE ===== */
+    /* PRIORIDAD MÁXIMA para que sea visible */
+    .inline-deletelink,
+    a.inline-deletelink,
+    a[role="button"].inline-deletelink,
+    [role="button"].inline-deletelink,
+    .inline-group .inline-deletelink,
+    .tabular .inline-deletelink,
+    a[class*="inline-deletelink"],
+    td.delete a,
+    .delete a[role="button"],
+    a[href*="Eliminar"],
+    .field-delete a {
+        background: #dc3545 !important;
+        background-color: #dc3545 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 1.4em !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        line-height: 1 !important;
+        padding: 6px 10px !important;
+        border-radius: 4px !important;
+        border: 2px solid #bd2130 !important;
+        min-width: 32px !important;
+        text-align: center !important;
+    }
+    
+    /* Agregar la X con ::before */
+    .inline-deletelink::before,
+    a.inline-deletelink::before,
+    a[role="button"].inline-deletelink::before,
+    td.delete a::before,
+    .field-delete a::before {
+        content: "✕" !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 1.2em !important;
+        display: inline-block !important;
+    }
+    
+    /* Forzar color BLANCO en el texto interno - MÁXIMA PRIORIDAD */
+    .inline-deletelink,
+    .inline-deletelink *,
+    a.inline-deletelink,
+    a.inline-deletelink *,
+    a[role="button"].inline-deletelink,
+    a[role="button"].inline-deletelink *,
+    td.delete a,
+    td.delete a *,
+    .field-delete a,
+    .field-delete a * {
+        color: #ffffff !important;
+    }
+    
+    
+    /* ===== BOTONES X DE ELIMINAR EN FORMSETS INLINE ===== */
+    /* PRIORIDAD MÁXIMA para que sea visible */
+    .inline-deletelink,
+    a.inline-deletelink,
+    a[role="button"].inline-deletelink,
+    [role="button"].inline-deletelink,
+    .inline-group .inline-deletelink,
+    .tabular .inline-deletelink,
+    a[class*="inline-deletelink"],
+    td.delete a,
+    .delete a[role="button"],
+    a[href*="Eliminar"],
+    .field-delete a {
+        background: #dc3545 !important;
+        background-color: #dc3545 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 16px !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        line-height: 26px !important;
+        padding: 0 !important;
+        border-radius: 3px !important;
+        border: 2px solid #bd2130 !important;
+        width: 28px !important;
+        height: 28px !important;
+        text-align: center !important;
+        overflow: hidden !important;
+        text-indent: -9999px !important;
+    }
+    
+    /* Agregar la X con ::before */
+    .inline-deletelink::before,
+    a.inline-deletelink::before,
+    a[role="button"].inline-deletelink::before,
+    td.delete a::before,
+    .field-delete a::before {
+        content: "✕" !important;
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        font-size: 16px !important;
+        display: block !important;
+        text-indent: 0 !important;
+        line-height: 26px !important;
+    }
+    
+    /* Forzar color BLANCO en el texto interno - MÁXIMA PRIORIDAD */
+    .inline-deletelink,
+    .inline-deletelink *,
+    a.inline-deletelink,
+    a.inline-deletelink *,
+    a[role="button"].inline-deletelink,
+    a[role="button"].inline-deletelink *,
+    td.delete a,
+    td.delete a *,
+    .field-delete a,
+    .field-delete a * {
+        color: #ffffff !important;
+    }
+    
+    /* Asegurar que el botón X sea visible en hover */
+    .inline-deletelink:hover,
+    a.inline-deletelink:hover,
+    a[role="button"].inline-deletelink:hover,
+    [role="button"].inline-deletelink:hover,
+    td.delete a:hover,
+    .field-delete a:hover {
+        background: #bd2130 !important;
+        background-color: #bd2130 !important;
+        color: #ffffff !important;
+        transform: scale(1.1) !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4) !important;
+    }
+    
+    /* Forzar color BLANCO en hover también en hijos */
+    .inline-deletelink:hover,
+    .inline-deletelink:hover *,
+    a.inline-deletelink:hover,
+    a.inline-deletelink:hover *,
+    td.delete a:hover,
+    td.delete a:hover *,
+    .field-delete a:hover,
+    .field-delete a:hover * {
+        color: #ffffff !important;
+    }
+    
+    /* Asegurar visibilidad en la columna delete */
+    td.delete,
+    td[class*="delete"],
+    .field-delete {
+        text-align: center !important;
+        vertical-align: middle !important;
+    }
+
+    /* ===== DASHBOARD MODULES CON MEJOR CONTRASTE ===== */
+    .module h2, .module caption, .inline-group h2 {
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%);
+        color: #ffffff !important;
+        padding: 12px 15px;
+        font-weight: 600;
+        border-left: 4px solid #e67e22;
+    }
+    
+    #content-main .module {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    /* ===== TABLAS CON MEJOR CONTRASTE Y SCROLL HORIZONTAL ===== */
+    #content-main table {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    /* Permitir scroll horizontal en tablas largas */
+    #result_list,
+    .results {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        max-width: 100% !important;
+        position: relative !important;
+    }
+
+    #changelist .results {
+        overflow-x: auto !important;
+    }
+
+    /* Hacer que la tabla use todo el ancho necesario */
+    #result_list table,
+    .results table {
+        min-width: 100% !important;
+        width: max-content !important;
+    }
+
+    /* Mejorar la barra de scroll horizontal */
+    #result_list::-webkit-scrollbar,
+    .results::-webkit-scrollbar {
+        height: 10px !important;
+    }
+
+    #result_list::-webkit-scrollbar-track,
+    .results::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+        border-radius: 5px !important;
+    }
+
+    #result_list::-webkit-scrollbar-thumb,
+    .results::-webkit-scrollbar-thumb {
+        background: #1a5490 !important;
+        border-radius: 5px !important;
+    }
+
+    #result_list::-webkit-scrollbar-thumb:hover,
+    .results::-webkit-scrollbar-thumb:hover {
+        background: #e67e22 !important;
+    }
+
+    /* ===== SCROLL HORIZONTAL FIJO (STICKY) ===== */
+    /* Hacer que el wrapper de resultados tenga doble barra de scroll */
+    .results {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        width: 100% !important;
+        position: relative !important;
+    }
+
+    /* Crear una barra de scroll horizontal fija en la parte inferior de la pantalla */
+
+
+    /* Alternativa: Usar JavaScript para scroll sincronizado */
+    /* Agregar un div espejo para scroll horizontal fijo */
+    #result_list {
+        position: relative !important;
+    }
+
+    /* Tabla con ancho automático */
+    .results table {
+        width: auto !important;
+        min-width: 100% !important;
+        table-layout: auto !important;
+    }
+
+    /* Headers sticky */
+    .results thead th {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+        background: linear-gradient(to bottom, #2a6eb0, #1a5490) !important;
+    }
+
+    /* Evitar compresión de columnas */
+    .results th,
+    .results td {
+        white-space: nowrap !important;
+    }
+
+    /* Barra de scroll más visible */
+    .results::-webkit-scrollbar {
+        height: 14px !important;
+    }
+
+    .results::-webkit-scrollbar-track {
+        background: #e8e8e8 !important;
+    }
+
+    .results::-webkit-scrollbar-thumb {
+        background: #1a5490 !important;
+        border-radius: 7px !important;
+    }
+
+    .results::-webkit-scrollbar-thumb:hover {
+        background: #e67e22 !important;
+    }
+
+
+
+    #content-main thead th {
+        background: linear-gradient(to bottom, #2a6eb0, #1a5490);
+        color: #ffffff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 0.5px;
+    }
+
+    #content-main thead th,
+    #content-main thead th a,
+    #content-main thead th span,
+    #content-main thead th .text {
+        color: #ffffff !important;
+    }
+
+    #content-main thead th a:hover {
+        color: #e67e22 !important;
+    }
+
+    #content-main tbody tr:hover {
+        background-color: #f0f7ff;
+    }
+
+    #content-main tbody td {
+        color: #2c3e50 !important;
+    }
+
+    #content-main tbody th {
+        color: #1a5490 !important;
+        font-weight: 600;
+    }
+
+    /* ===== LINKS CON MEJOR CONTRASTE ===== */
+    a:link, a:visited {
+        color: #1a5490 !important;
+        transition: color 0.2s ease;
+    }
+
+    a:hover {
+        color: #e67e22 !important;
+    }
+
+    .addlink, .changelink, .viewlink, .deletelink {
+        font-weight: 500;
+    }
+
+    /* ===== MENSAJES ===== */
+    .messagelist li {
+        border-radius: 6px;
+        padding: 12px 20px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .messagelist .success {
+        background-color: #d4edda;
+        border-left: 4px solid #28a745;
+        color: #155724 !important;
+    }
+
+    .messagelist .warning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        color: #856404 !important;
+    }
+
+    .messagelist .error {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+        color: #721c24 !important;
+    }
+
+    /* ===== FOOTER CORPORATIVO CON USUARIO A LA IZQUIERDA ===== */
+    #footer {
+        background: linear-gradient(135deg, #2c3e50 0%, #1a5490 100%);
+        color: #ffffff;
+        padding: 25px 20px;
+        border-top: 4px solid #e67e22;
+        margin-top: 40px;
+    }
+
+    .footer-content-with-user {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 30px;
+        max-width: 1400px;
+        margin: 0 auto;
+        align-items: start;
+    }
+
+    /* TARJETA DE USUARIO - AVATAR A LA IZQUIERDA, INFO A LA DERECHA */
+    .user-info-card-footer {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 15px 20px;
+        display: grid;
+        grid-template-columns: 70px 1fr;
+        gap: 20px;
+        align-items: center;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .user-info-card-footer .user-avatar {
+        font-size: 3.5em;
+        color: #ffffff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .user-info-card-footer .user-details {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        color: #ffffff;
+    }
+
+    .user-info-card-footer .user-name {
+        font-size: 1.2em;
+        font-weight: 700;
+        color: #ffffff !important;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        letter-spacing: 0.3px;
+    }
+
+    .user-info-card-footer .user-role {
+        font-size: 0.95em;
+        color: #ffd700 !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .user-info-card-footer .user-role i {
+        color: #ffd700;
+    }
+
+    .user-info-card-footer .user-email {
+        font-size: 0.85em;
+        color: #e0e0e0 !important;
+        font-weight: 400;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .user-info-card-footer .user-email i {
+        color: #e67e22;
+    }
+
+    /* INFO DE LA EMPRESA A LA DERECHA */
+    .footer-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        align-items: start;
+    }
+
+    .footer-section {
+        padding: 10px;
+    }
+
+    .footer-section h4 {
+        color: #ffffff !important;
+        font-size: 1em;
+        margin-bottom: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .footer-section p {
+        color: #e0e0e0 !important;
+        margin: 8px 0;
+        font-size: 0.9em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .footer-section a {
+        color: #ffffff !important;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .footer-section a:hover {
+        color: #e67e22 !important;
+    }
+
+    .footer-section i {
+        color: #e67e22;
+        width: 20px;
+        text-align: center;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+        .footer-content-with-user {
+            grid-template-columns: 1fr;
+        }
+        
+        .footer-content {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+        
+        .footer-section h4,
+        .footer-section p {
+            justify-content: center;
+        }
+    }
+
+    /* ===== CAMPO DE BÚSQUEDA ===== */
+    #searchbar, #nav-filter {
+        border-radius: 20px;
+        border: 2px solid #1a5490;
+        padding: 8px 15px;
+        transition: all 0.3s ease;
+    }
+
+    #searchbar:focus, #nav-filter:focus {
+        border-color: #e67e22;
+        box-shadow: 0 0 8px rgba(230, 126, 34, 0.3);
+        outline: none;
+    }
+
+    /* ===== FILTROS LATERALES CON MEJOR CONTRASTE ===== */
+    #changelist-filter {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+    }
+
+    #changelist-filter h2 {
+        background: linear-gradient(135deg, #2a6eb0 0%, #1a5490 100%) !important;
+        color: #ffffff !important;
+        font-size: 1.1em;
+        padding: 12px 15px !important;
+        border-bottom: none !important;
+        border-left: 4px solid #e67e22 !important;
+        margin-bottom: 15px;
+        border-radius: 4px;
+    }
+
+    #changelist-filter h3 {
+        color: #2c3e50 !important;
+        font-size: 0.95em;
+        font-weight: 600;
+        margin: 15px 0 8px 0;
+    }
+        
+    #changelist-filter li {
+        margin: 3px 0 !important;
+    }
+
+    #changelist-filter li a {
+        background: #f8f9fa !important;
+        color: #1a5490 !important;
+        padding: 8px 12px !important;
+        border-radius: 5px !important;
+        font-weight: 600 !important;
+        display: block !important;
+        text-decoration: none !important;
+        transition: all 0.2s ease !important;
+    }
+
+    #changelist-filter li.selected a {
+        background: #1a5490 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    #changelist-filter li a:hover {
+        background: #e8eef3 !important;
+        color: #e67e22 !important;
+        transform: translateX(3px) !important;
+    }
+
+    #changelist-filter li.selected a:hover {
+        background: #1a5490 !important;
+        color: #ffffff !important;
+        transform: none !important;
+    }
+    
+    /* ===== BOTONES DE REPORTE PDF Y DESCARGAR PDF ===== */
+    a.button[href*="reporte-pdf"],
+    a[href*="reporte-pdf"],
+    a.button[href*="descargar-pdf"],
+    a[href*="descargar-pdf"],
+    .field-ver_reporte_link a,
+    .field-boton_descargar_pdf a,
+    a[target="_blank"][href*="pdf"] {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+        color: #ffffff !important;
+        padding: 8px 16px !important;
+        border-radius: 6px !important;
+        text-decoration: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        font-weight: 600 !important;
+        font-size: 0.9em !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3) !important;
+        border: none !important;
+    }
+
+    a.button[href*="reporte-pdf"]:hover,
+    a[href*="reporte-pdf"]:hover,
+    a.button[href*="descargar-pdf"]:hover,
+    a[href*="descargar-pdf"]:hover,
+    .field-ver_reporte_link a:hover,
+    .field-boton_descargar_pdf a:hover {
+        background: linear-gradient(135deg, #c82333 0%, #bd2130 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.5) !important;
+        color: #ffffff !important;
+    }
+
+    /* Icono del PDF con Font Awesome */
+    a.button[href*="reporte-pdf"]::before,
+    a[href*="reporte-pdf"]::before,
+    a.button[href*="descargar-pdf"]::before,
+    a[href*="descargar-pdf"]::before,
+    .field-ver_reporte_link a::before,
+    .field-boton_descargar_pdf a::before {
+        content: "\f1c1" !important;
+        font-family: "Font Awesome 6 Free" !important;
+        font-weight: 900 !important;
+        font-size: 1.1em !important;
+        color: #ffffff !important;
+    }
+
+    /* FORZAR texto blanco en TODO - MÁXIMA PRIORIDAD */
+    a.button[href*="reporte-pdf"],
+    a.button[href*="reporte-pdf"] *,
+    a[href*="reporte-pdf"],
+    a[href*="reporte-pdf"] *,
+    a.button[href*="descargar-pdf"],
+    a.button[href*="descargar-pdf"] *,
+    a[href*="descargar-pdf"],
+    a[href*="descargar-pdf"] *,
+    .field-ver_reporte_link a,
+    .field-ver_reporte_link a *,
+    .field-boton_descargar_pdf a,
+    .field-boton_descargar_pdf a *,
+    a[target="_blank"][href*="pdf"],
+    a[target="_blank"][href*="pdf"] * {
+        color: #ffffff !important;
+    }
+
+    /* FORZAR en hover también */
+    a.button[href*="reporte-pdf"]:hover,
+    a.button[href*="reporte-pdf"]:hover *,
+    a[href*="reporte-pdf"]:hover,
+    a[href*="reporte-pdf"]:hover *,
+    a.button[href*="descargar-pdf"]:hover,
+    a.button[href*="descargar-pdf"]:hover *,
+    a[href*="descargar-pdf"]:hover,
+    a[href*="descargar-pdf"]:hover *,
+    .field-ver_reporte_link a:hover,
+    .field-ver_reporte_link a:hover *,
+    .field-boton_descargar_pdf a:hover,
+    .field-boton_descargar_pdf a:hover * {
+        color: #ffffff !important;
+    }
+
+    /* Sobrescribir cualquier estilo de link azul */
+    #content-main a[href*="reporte-pdf"],
+    #content-main a[href*="reporte-pdf"]:link,
+    #content-main a[href*="reporte-pdf"]:visited,
+    #content-main a[href*="descargar-pdf"],
+    #content-main a[href*="descargar-pdf"]:link,
+    #content-main a[href*="descargar-pdf"]:visited {
+        color: #ffffff !important;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .brand-title {
+            font-size: 1.2em;
+        }
+        
+        .admin-logo {
+            height: 40px;
+        }
+        
+        #header {
+            padding: 10px 15px;
+        }
+        
+        .footer-content {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+        
+        .footer-section h4,
+        .footer-section p {
+            justify-content: center;
+        }
+    }
+
+    /* ===== ESTILOS PARA PÁGINA DE LOGIN ===== */
+    body.login #header {
+        padding: 15px 20px !important;
+    }
+
+    body.login .admin-logo {
+        height: 50px !important;
+        width: auto !important;
+    }
+
+    body.login .brand-title {
+        font-size: 0.85em !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    body.login .brand-subtitle {
+        font-size: 0.6em !important;
+    }
+
+    body.login #site-name a {
+        gap: 8px !important;
+    }
+
+    /* Ajustar contenedor de login */
+    body.login #content {
+        padding: 20px 20px !important;
+    }
+
+    body.login #container {
+        min-height: auto !important;
+    }
+
+    /* ===== FORZAR TEXTO BLANCO EN TODOS LOS FONDOS OSCUROS ===== */
+    #header *,
+    .breadcrumbs *,
+    #nav-sidebar .module caption *,
+    #changelist-filter h2 *,
+    #content-main thead th *,
+    .module h2 *,
+    .module caption * {
+        color: inherit !important;
+    }
+
+    .breadcrumbs > a {
+        color: #ffffff !important;
+    }
+
+    #nav-sidebar .module caption {
+        background: linear-gradient(135deg, #1a5490 0%, #2c5490 100%);
+    }
+
+    #nav-sidebar .module caption,
+    #nav-sidebar .module caption * {
+        color: #ffffff !important;
+    }
+
+    #content h1,
+    #content-main h1 {
+        color: #ffffff !important;
+        background: linear-gradient(135deg, #2a6eb0 0%, #1a5490 100%);
+        padding: 15px 20px;
+        border-radius: 8px;
+        border-left: 4px solid #e67e22;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    #changelist-filter li.selected > a,
+    #changelist-filter li[class="selected"] > a,
+    nav#changelist-filter li.selected a {
+        background-color: #34495e !important;
+        background: #34495e !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    #changelist-filter a[style*="background"] {
+        color: #ffffff !important;
+    }
+
+    #changelist-filter li:not(.selected) a {
+        background: #f8f9fa !important;
+        color: #1a5490 !important;
+    }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ✅ BUSCAR EL CONTENEDOR DE LA TABLA
+    const possibleSelectors = [
+        '.results',              
+        '.table-container',      
+        '.entregas-table',       
+        '.stock-table',          
+        '.movimientos-table'     
+    ];
+    
+    let tableContainer = null;
+    
+    // Buscar el primer contenedor válido
+    for (let selector of possibleSelectors) {
+        tableContainer = document.querySelector(selector);
+        if (tableContainer) break;
+    }
+    
+    // Envolver tablas directas si no tienen contenedor
+    if (!tableContainer) {
+        const directTables = document.querySelectorAll('table.entregas-table, table.stock-table, table.movimientos-table');
+        if (directTables.length > 0) {
+            const table = directTables[0];
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-scroll-wrapper';
+            wrapper.style.cssText = 'overflow-x: auto; overflow-y: visible; width: 100%; position: relative;';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+            tableContainer = wrapper;
+        }
+    }
+    
+    if (tableContainer) {
+        // 1. Crear el contenedor del scroll flotante
+        const scrollbarContainer = document.createElement('div');
+        scrollbarContainer.className = 'sticky-scrollbar-container';
+        scrollbarContainer.style.cssText = `
+            position: fixed;
+            bottom: 0px;
+            height: 18px; /* Un poco más delgado para elegancia */
+            overflow-x: auto;
+            overflow-y: hidden;
+            z-index: 999;
+            background: rgba(245, 245, 245, 0.9); /* Ligeramente transparente */
+            border-top: 1px solid #dcdcdc;
+            display: none;
+        `;
+
+        // 2. Crear el "relleno" interno
+        const scrollbarContent = document.createElement('div');
+        scrollbarContent.style.height = '1px';
+        scrollbarContainer.appendChild(scrollbarContent);
+        
+        document.body.appendChild(scrollbarContainer);
+
+        // --- LÓGICA PRINCIPAL CORREGIDA ---
+        function checkScrollbarVisibility() {
+            if (!tableContainer) return;
+
+            const rect = tableContainer.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            
+            // Dimensiones
+            const tableScrollWidth = tableContainer.scrollWidth;
+            const tableClientWidth = tableContainer.clientWidth;
+            
+            // 1. ¿La tabla es más ancha que su contenedor? (Necesita scroll)
+            const needsScroll = tableScrollWidth > tableClientWidth;
+
+            // 2. LÓGICA DE VISIBILIDAD (EL ARREGLO):
+            // La barra debe verse SOLO si:
+            // a) La parte superior de la tabla ya entró en pantalla (rect.top < windowHeight)
+            // b) La parte inferior de la tabla AÚN NO es visible (rect.bottom > windowHeight)
+            //    (Si rect.bottom <= windowHeight, ya vemos la barra nativa de la tabla, no necesitamos la flotante).
+            const isTableInSweetSpot = (rect.top < windowHeight) && (rect.bottom > windowHeight);
+
+            // Sincronizar anchos y posición
+            scrollbarContent.style.width = tableScrollWidth + 'px';
+            scrollbarContainer.style.width = tableClientWidth + 'px';
+            scrollbarContainer.style.left = rect.left + 'px';
+
+            // Mostrar u ocultar basado en las dos condiciones
+            if (needsScroll && isTableInSweetSpot) {
+                scrollbarContainer.style.display = 'block';
+            } else {
+                scrollbarContainer.style.display = 'none';
+            }
+        }
+
+        // --- SINCRONIZACIÓN DE SCROLL ---
+        let isSyncing = false; // Evitar bucle infinito de eventos scroll
+
+        scrollbarContainer.addEventListener('scroll', function() {
+            if (!isSyncing) {
+                isSyncing = true;
+                tableContainer.scrollLeft = scrollbarContainer.scrollLeft;
+                requestAnimationFrame(() => isSyncing = false);
+            }
+        });
+
+        tableContainer.addEventListener('scroll', function() {
+            if (!isSyncing) {
+                isSyncing = true;
+                scrollbarContainer.scrollLeft = tableContainer.scrollLeft;
+                requestAnimationFrame(() => isSyncing = false);
+            }
+        });
+
+        // Eventos que disparan el recálculo
+        window.addEventListener('scroll', checkScrollbarVisibility, { passive: true });
+        window.addEventListener('resize', checkScrollbarVisibility);
+        
+        // Ejecución inicial
+        setTimeout(checkScrollbarVisibility, 100);
+        setTimeout(checkScrollbarVisibility, 500); 
+    }
+});
+</script>
+{% endblock %}

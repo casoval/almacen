@@ -1,0 +1,590 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Importar Productos - Reporte Final{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .import-container {
+        max-width: 950px;
+        margin: 20px auto;
+        background: white;
+        padding: 25px 35px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .step-header {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .step-header h1 {
+        font-size: 18px;
+        margin: 0 0 4px 0;
+        color: #333;
+        font-weight: 600;
+    }
+    .step-header p {
+        font-size: 12px;
+        color: #666;
+        margin: 0;
+    }
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .step {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #666;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    .step.completed {
+        background: #4caf50;
+        color: white;
+    }
+    .success-box, .error-box, .info-box, .warning-box {
+        padding: 12px 15px;
+        margin: 12px 0;
+        border-radius: 4px;
+        border-left: 4px solid;
+    }
+    .success-box {
+        background: #f0f9f4;
+        border-left-color: #28a745;
+    }
+    .error-box {
+        background: #fff5f5;
+        border-left-color: #dc3545;
+    }
+    .info-box {
+        background: #f0f7fa;
+        border-left-color: #2196f3;
+    }
+    .warning-box {
+        background: #fffbf0;
+        border-left-color: #ffc107;
+    }
+    .success-box h3, .error-box h3 {
+        margin: 0 0 8px 0;
+        font-size: 15px;
+    }
+    .success-box p, .error-box p, .info-box p, .warning-box p {
+        margin: 5px 0;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin: 12px 0;
+    }
+    .stat-card {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+        border: 2px solid #ddd;
+    }
+    .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #417690;
+        margin: 6px 0;
+    }
+    .stat-label {
+        color: #666;
+        font-size: 11px;
+    }
+    .detail-list {
+        background: #f8f9fa;
+        border-radius: 4px;
+        padding: 10px 12px;
+        margin: 8px 0;
+    }
+    .detail-list ul {
+        margin: 6px 0;
+        padding-left: 16px;
+        line-height: 1.6;
+    }
+    .detail-list li {
+        margin: 3px 0;
+        font-size: 12px;
+    }
+    .error-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: 11px;
+    }
+    .error-table th {
+        background: #dc3545;
+        color: white;
+        padding: 6px;
+        text-align: left;
+        font-weight: 600;
+    }
+    .error-table td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        color: #555;
+    }
+    .btn-custom {
+        background: #417690;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-block;
+        margin: 0 4px;
+        transition: background 0.3s;
+    }
+    .btn-custom:hover {
+        background: #2d5469;
+        text-decoration: none;
+        color: white;
+    }
+    .btn-custom.btn-secondary {
+        background: #6c757d;
+    }
+    .btn-custom.btn-secondary:hover {
+        background: #545b62;
+    }
+    h3.section-title {
+        font-size: 15px;
+        margin: 18px 0 10px 0;
+        color: #333;
+        font-weight: 600;
+    }
+    h4.subsection-title {
+        font-size: 13px;
+        margin: 12px 0 6px 0;
+        color: #555;
+        font-weight: 600;
+    }
+
+    /* ===== AJUSTES PROFESIONALES PARA PÁGINAS DE IMPORTACIÓN ===== */
+
+    /* HEADER - Logo y título en línea horizontal */
+    #header {
+        padding: 12px 20px !important;
+        border-bottom: none !important;
+    }
+
+    #site-name a {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 15px !important;
+        background: none !important;
+    }
+
+    #site-name a:hover {
+        transform: none !important;
+        background: none !important;
+    }
+
+    .admin-logo {
+        height: 45px !important;
+        width: auto !important;
+    }
+
+    .brand-text {
+        display: flex !important;
+        flex-direction: column !important;
+        line-height: 1.3 !important;
+        justify-content: center !important;
+    }
+
+    .brand-title {
+        font-size: 1em !important;
+        letter-spacing: 1px !important;
+        font-weight: 700 !important;
+    }
+
+    .brand-subtitle {
+        font-size: 0.7em !important;
+        letter-spacing: 0.5px !important;
+        margin-top: 2px !important;
+    }
+
+    /* FOOTER PROFESIONAL */
+    #footer {
+        background: #2c3e50 !important;
+        color: #ecf0f1 !important;
+        padding: 20px 30px !important;
+        border-top: none !important;
+        margin-top: 40px !important;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+    }
+
+    .footer-content {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 20px !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+    }
+
+    .footer-section {
+        padding: 0 !important;
+        flex: 1 !important;
+        min-width: 200px !important;
+    }
+
+    .footer-section h4 {
+        color: #ffffff !important;
+        font-size: 0.95em !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .footer-section p {
+        color: #bdc3c7 !important;
+        margin: 6px 0 !important;
+        font-size: 0.85em !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        line-height: 1.5 !important;
+    }
+
+    .footer-section a {
+        color: #3498db !important;
+        text-decoration: none !important;
+        transition: color 0.2s ease !important;
+        font-weight: 500 !important;
+    }
+
+    .footer-section a:hover {
+        color: #5dade2 !important;
+    }
+
+    .footer-section i {
+        color: #3498db !important;
+        width: 18px !important;
+        text-align: center !important;
+        font-size: 1em !important;
+    }
+
+    .footer-section:first-child h4 {
+        font-size: 1.05em !important;
+        color: #3498db !important;
+    }
+
+    .footer-section:last-child p {
+        font-size: 0.8em !important;
+        color: #95a5a6 !important;
+    }
+
+    /* ===== MEJORA DE BOTONES ===== */
+
+    /* Botón Principal (Siguiente, Confirmar, etc.) */
+    .btn-custom,
+    button[type="submit"].btn-custom,
+    input[type="submit"].btn-custom {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3) !important;
+        text-transform: none !important;
+        letter-spacing: 0.3px !important;
+    }
+
+    .btn-custom:hover,
+    button[type="submit"].btn-custom:hover {
+        background: linear-gradient(135deg, #229954 0%, #1e8449 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(39, 174, 96, 0.4) !important;
+        color: #ffffff !important;
+    }
+
+    .btn-custom:disabled {
+        background: #95a5a6 !important;
+        cursor: not-allowed !important;
+        opacity: 0.6 !important;
+        transform: none !important;
+    }
+
+    /* Botón Atrás / Cancelar - MEJORADO CON TEXTO BLANCO */
+    .btn-back,
+    .btn-cancel,
+    a.btn-back,
+    a.btn-cancel,
+    button.btn-back {
+        background: #5d6d7e !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 6px rgba(93, 109, 126, 0.3) !important;
+        margin-right: 10px !important;
+    }
+
+    .btn-back:hover,
+    .btn-cancel:hover,
+    a.btn-back:hover,
+    a.btn-cancel:hover {
+        background: #4a5a6a !important;
+        color: #ffffff !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 10px rgba(93, 109, 126, 0.4) !important;
+    }
+
+    /* Botón secundario adicional */
+    .btn-custom.btn-secondary {
+        background: #3498db !important;
+        box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3) !important;
+    }
+
+    .btn-custom.btn-secondary:hover {
+        background: #2980b9 !important;
+        box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4) !important;
+    }
+
+    /* Asegurar que todos los textos de botones sean blancos */
+    .btn-custom,
+    .btn-custom *,
+    .btn-back,
+    .btn-back *,
+    .btn-cancel,
+    .btn-cancel *,
+    button[type="submit"],
+    button[type="submit"] * {
+        color: #ffffff !important;
+    }
+
+    /* Contenedor de botones */
+    div[style*="text-align: center"] {
+        margin-top: 25px !important;
+        padding-top: 15px !important;
+        border-top: 1px solid #e0e0e0 !important;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        #site-name a {
+            gap: 10px !important;
+        }
+        
+        .admin-logo {
+            height: 40px !important;
+        }
+        
+        .brand-title {
+            font-size: 0.9em !important;
+        }
+        
+        .brand-subtitle {
+            font-size: 0.65em !important;
+        }
+        
+        #footer {
+            padding: 15px 20px !important;
+        }
+        
+        .footer-content {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 15px !important;
+        }
+        
+        .footer-section {
+            width: 100% !important;
+        }
+        
+        .footer-section h4,
+        .footer-section p {
+            justify-content: flex-start !important;
+        }
+        
+        /* Botones responsive */
+        .btn-custom,
+        .btn-back,
+        .btn-cancel {
+            padding: 10px 18px !important;
+            font-size: 13px !important;
+            margin: 5px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-container">
+    <div class="step-header">
+        <h1>Importar Productos desde Excel</h1>
+        <p>Paso 5 de 5: Reporte final</p>
+    </div>
+
+    <div class="step-indicator">
+        <div class="step completed">1</div>
+        <div class="step completed">2</div>
+        <div class="step completed">3</div>
+        <div class="step completed">4</div>
+        <div class="step completed">5</div>
+    </div>
+
+    {% if resultado.error_general %}
+    <div class="error-box">
+        <h3>⛔ Error General</h3>
+        <p>{{ resultado.error_general }}</p>
+        
+        {% if resultado.productos_protegidos > 0 %}
+        <div style="margin-top: 12px; padding: 10px; background: white; border-radius: 4px;">
+            <strong style="font-size: 13px;">💡 Recomendaciones:</strong>
+            <ul style="margin: 6px 0; padding-left: 16px; line-height: 1.6; font-size: 12px;">
+                <li>Use el modo <strong>"Importar solo nuevos"</strong></li>
+                <li>Los productos en uso permanecerán intactos</li>
+                <li>Los nuevos productos se agregarán sin conflictos</li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="{% url 'admin:productos_producto_importar' %}" class="btn-custom">🔄 Reintentar</a>
+        <a href="{% url 'admin:productos_producto_changelist' %}" class="btn-custom btn-secondary">← Volver</a>
+    </div>
+    {% else %}
+    <div class="success-box">
+        <h3>✅ Importación Completada</h3>
+        <p>El proceso finalizó correctamente. Revise el reporte detallado a continuación.</p>
+    </div>
+
+    <h3 class="section-title">📊 Estadísticas Generales</h3>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Productos Importados</div>
+            <div class="stat-number" style="color: #28a745;">{{ resultado.exitosos }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Productos Saltados</div>
+            <div class="stat-number" style="color: #ffc107;">{{ resultado.saltados }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Errores</div>
+            <div class="stat-number" style="color: #dc3545;">{{ resultado.errores|length }}</div>
+        </div>
+    </div>
+
+    {% if resultado.productos_por_tipo %}
+    <h3 class="section-title">📦 Productos por Tipo</h3>
+    <div class="detail-list">
+        <ul>
+            <li><strong>Insumos (I):</strong> {{ resultado.productos_por_tipo.I|default:0 }}</li>
+            <li><strong>Equipos (E):</strong> {{ resultado.productos_por_tipo.E|default:0 }}</li>
+            <li><strong>Herramientas (H):</strong> {{ resultado.productos_por_tipo.H|default:0 }}</li>
+            <li><strong>Otros (O):</strong> {{ resultado.productos_por_tipo.O|default:0 }}</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if resultado.categorias_creadas %}
+    <div class="info-box">
+        <h4 class="subsection-title">🆕 Categorías Creadas</h4>
+        <div class="detail-list">
+            <ul>
+                {% for cat in resultado.categorias_creadas %}
+                <li>{{ cat }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if resultado.unidades_creadas %}
+    <div class="info-box">
+        <h4 class="subsection-title">🆕 Unidades de Medida Creadas</h4>
+        <div class="detail-list">
+            <ul>
+                {% for unidad in resultado.unidades_creadas %}
+                <li>{{ unidad }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if resultado.codigos_ajustados %}
+    <div class="warning-box">
+        <h4 class="subsection-title">🔧 Códigos Ajustados/Re-enumerados</h4>
+        <div class="detail-list">
+            <ul>
+                {% for codigo in resultado.codigos_ajustados %}
+                <li><strong>{{ codigo.original }}</strong> → {{ codigo.nuevo }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if resultado.errores %}
+    <div class="error-box">
+        <h4 class="subsection-title">⛔ Errores Durante Importación</h4>
+        <table class="error-table">
+            <thead>
+                <tr>
+                    <th>Fila</th>
+                    <th>Nombre</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for error in resultado.errores %}
+                <tr>
+                    <td>{{ error.fila }}</td>
+                    <td>{{ error.nombre }}</td>
+                    <td>{{ error.error }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if resultado.saltados > 0 %}
+    <div class="warning-box">
+        <h4 class="subsection-title">⏭️ Productos Saltados</h4>
+        <p>Se saltaron {{ resultado.saltados }} producto(s) porque ya existían (mismo nombre y unidad).</p>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div style="text-align: center; margin-top: 25px;">
+        <a href="{% url 'admin:productos_producto_changelist' %}" class="btn-custom">✅ Ir a Productos</a>
+    </div>
+</div>
+{% endblock %}

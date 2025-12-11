@@ -1,0 +1,2027 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    
+    .entregas-container {
+        padding: 20px;
+        max-width: 100%;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .page-header h1 {
+        margin: 0 0 10px 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .page-header p {
+        margin: 0;
+        font-size: 15px;
+        opacity: 0.95;
+    }
+    
+    /* Filtros Mejorados */
+    .filters-container {
+        background: #2c3e50;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .vista-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #34495e;
+    }
+    
+    .vista-tab {
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        color: #95a5a6;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .vista-tab:hover {
+        color: #ecf0f1;
+    }
+    
+    .vista-tab.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+    }
+    
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .filter-group label {
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #ecf0f1;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 14px 16px;
+        border: 1px solid #95a5a6;
+        border-radius: 6px;
+        font-size: 15px;
+        background: #ffffff;
+        transition: all 0.3s ease;
+        width: 100%;
+        height: 48px;
+        line-height: 1.5;
+    }
+    
+    .filter-group select {
+        cursor: pointer;
+    }
+    
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 13px 26px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-info {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-info:hover {
+        background: #7f8c8d;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn svg {
+        flex-shrink: 0;
+    }
+    
+    /* Tarjetas de Estadísticas Mejoradas */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid #667eea;
+        cursor: pointer;
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        border-left-color: #5568d3;
+    }
+    
+    .stat-card:hover::before {
+        opacity: 1;
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 15px 0;
+        font-size: 13px;
+        color: #bdc3c7;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .stat-card .number {
+        font-size: 38px;
+        font-weight: 700;
+        color: #ecf0f1;
+        position: relative;
+        z-index: 1;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .stat-card .subtitle {
+        font-size: 12px;
+        color: #95a5a6;
+        margin-top: 8px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .stat-card.success {
+        border-left-color: #27ae60;
+    }
+    
+    .stat-card.warning {
+        border-left-color: #f39c12;
+    }
+    
+    .stat-card.info {
+        border-left-color: #3498db;
+    }
+    
+    /* Tabla Mejorada */
+    .table-container {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow-x: auto;
+        margin-bottom: 25px;
+    }
+    
+    .table-container h2 {
+        margin: 0 0 20px 0;
+        color: #2c3e50;
+        font-size: 20px;
+        font-weight: 700;
+        border-bottom: 3px solid #667eea;
+        padding-bottom: 10px;
+    }
+    
+    .entregas-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1400px;
+    }
+    
+    .entregas-table thead tr {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    }
+    
+    .entregas-table th {
+        padding: 16px 14px;
+        text-align: left;
+        font-weight: 700;
+        color: #ecf0f1;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 3px solid #667eea;
+        background-color: #2c3e50;
+    }
+    
+    .entregas-table th.text-right,
+    .entregas-table th.text-center {
+        text-align: right;
+    }
+    
+    .entregas-table th.text-center {
+        text-align: center;
+    }
+    
+    .entregas-table td {
+        padding: 14px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+        color: #4a5568;
+        white-space: nowrap;
+    }
+    
+    .entregas-table td.text-right {
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    .entregas-table td.text-center {
+        text-align: center;
+    }
+    
+    .entregas-table tbody tr {
+        transition: all 0.2s ease;
+        background: #ffffff;
+    }
+    
+    .entregas-table tbody tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    
+    .entregas-table tbody tr:hover {
+        background: #e3f2fd;
+        transform: scale(1.01);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .entregas-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    /* Estilo Base para códigos (Asegura que padding y font se mantengan) */
+    .codigo-cliente-badge, .codigo-producto-badge {
+        padding: 3px 6px;
+        border-radius: 3px;
+        font-size: 16px;
+        font-family: monospace;
+        font-weight: 700; /* Añadimos bold para mejor lectura */
+    }
+
+    /* 1. ESTILO ESPECÍFICO PARA CÓD. CLIENTE (Ej. Azul Claro) */
+    .codigo-cliente-badge {
+        background: #1f4b8d; /* Fondo: Azul pálido */
+        color: #ffffff;      /* Letra: Azul oscuro */
+    }
+
+    /* 2. ESTILO ESPECÍFICO PARA CÓD. PRODUCTO (Ej. Naranja Pálido) */
+    .codigo-producto-badge {
+        background: #0051ff; /* Fondo: Naranja pálido */
+        color: #f8f8f8;      /* Letra: Naranja oscuro */
+    }
+    .badge {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        display: inline-block;
+    }
+    
+    .badge-primary {
+        background-color: #cfe2ff;
+        color: #084298;
+    }
+    
+    .badge-success {
+        background-color: #d1e7dd;
+        color: #0a3622;
+    }
+    
+    .entrega-buena {
+        color: #27ae60;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .entrega-danada {
+        color: #e74c3c;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .entrega-total {
+        color: #3498db;
+        font-weight: 700;
+        font-size: 16px;
+        background: #e3f2fd;
+        padding: 6px 12px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .stock-bueno {
+        color: #27ae60;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .stock-danado {
+        color: #e74c3c;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    
+    .stock-total {
+        color: #3498db;
+        font-weight: 700;
+        font-size: 16px;
+        background: #e3f2fd;
+        padding: 6px 12px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .no-data {
+        text-align: center;
+        padding: 50px;
+        color: #95a5a6;
+        font-size: 16px;
+        font-weight: 500;
+    }
+    
+    /* Botón de acción en tabla */
+    .btn-ver-detalle {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-ver-detalle:hover {
+        background: #5568d3;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    
+    /* Resúmenes Laterales Mejorados */
+    .summaries-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+    }
+    
+    .sidebar-summary {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-top: 4px solid #667eea;
+    }
+    
+    .sidebar-summary h3 {
+        margin: 0 0 20px 0;
+        font-size: 18px;
+        color: #2c3e50;
+        font-weight: 700;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 12px;
+    }
+    
+    .top-item {
+        padding: 14px;
+        border-bottom: 1px solid #e9ecef;
+        transition: all 0.2s ease;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .top-item:hover {
+        background: #f8f9fa;
+        padding-left: 18px;
+    }
+    
+    .top-item:last-child {
+        border-bottom: none;
+    }
+    
+    .top-item .rank {
+        font-size: 20px;
+        font-weight: bold;
+        color: #667eea;
+        width: 30px;
+    }
+    
+    .top-item .info {
+        flex: 1;
+        margin: 0 15px;
+    }
+    
+    .top-item .name {
+        font-weight: bold;
+        color: #2c3e50;
+        display: block;
+        font-size: 15px;
+    }
+    
+    .top-item .detail {
+        font-size: 12px;
+        color: #546e7a;
+    }
+    
+    .top-item .value {
+        text-align: right;
+    }
+    
+    .top-item .value .main {
+        font-size: 16px;
+        font-weight: bold;
+        color: #667eea;
+        display: block;
+    }
+    
+    .top-item .value .sub {
+        font-size: 11px;
+        color: #7f8c8d;
+    }
+    
+    .cliente-item {
+        padding: 14px;
+        border-bottom: 1px solid #e9ecef;
+        transition: all 0.2s ease;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .cliente-item:hover {
+        background: #f8f9fa;
+        padding-left: 18px;
+    }
+    
+    .cliente-item:last-child {
+        border-bottom: none;
+    }
+    
+    .cliente-name {
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 15px;
+    }
+    
+    .cliente-value {
+        color: #667eea;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    
+    /* Modal Styles */
+    .entregas-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        max-width: 900px;
+        width: 90%;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        animation: modalSlideIn 0.3s ease;
+        border: 2px solid #e2e8f0;
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .modal-header {
+        padding: 25px 30px;
+        border-bottom: 3px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .modal-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        font-size: 28px;
+        color: #ffffff;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        border-radius: 4px;
+    }
+    
+    .modal-close:hover {
+        background: #e74c3c;
+        border-color: #e74c3c;
+        transform: rotate(90deg);
+    }
+    
+    .modal-body {
+        padding: 25px;
+        overflow-y: auto;
+        flex: 1;
+        background: #f8f9fa;
+    }
+    
+    .modal-footer {
+        padding: 20px 30px;
+        border-top: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        background: #ffffff;
+        border-radius: 0 0 12px 12px;
+    }
+    
+    .detalle-estadistica-card {
+        background: white;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 4px solid #667eea;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    .detalle-estadistica-card h4 {
+        margin: 0 0 15px 0;
+        color: #2c3e50;
+        font-size: 16px;
+        font-weight: 700;
+    }
+    
+    .detalle-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .detalle-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detalle-label {
+        color: #546e7a;
+        font-weight: 600;
+    }
+    
+    .detalle-value {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    .cantidad-buena {
+        color: #27ae60;
+    }
+    
+    .cantidad-danada {
+        color: #e74c3c;
+    }
+    
+    .movimiento-mini {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        transition: background 0.2s ease;
+    }
+    
+    .movimiento-mini:hover {
+        background: #e3f2fd;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .filter-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .stats-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .summaries-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .button-group {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+    }
+
+/* 1. Asegura la alineación del grupo a la izquierda (Si no lo tienes) */
+    .filter-checkbox-group {
+        display: flex;
+        justify-content: flex-start; 
+        align-items: center; 
+        gap: 8px; 
+        padding-top: 5px; 
+    }
+
+    /* 2. Regla específica para anular estilos generales en el checkbox (EL CÓDIGO CLAVE) */
+    .filter-group input[type="checkbox"] {
+        /* Mantenemos auto para anular la altura fija (48px) */
+        height: auto !important; 
+        width: auto !important;  
+        
+        /* AJUSTE CLAVE: Aplicamos una escala de 1.3 para que sea visible y usable */
+        transform: scale(2); 
+        
+        /* Aseguramos que la alineación vertical sea correcta (si es necesario) */
+        /* Este estilo ayuda a que se centre en la línea de texto */
+        align-self: center;
+        
+        margin-left: 0;
+        margin-right: 8px;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="entregas-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1>📊 {{ title }}</h1>
+        <p>Reporte completo de entregas a clientes con análisis detallado de productos y movimientos</p>
+    </div>
+    
+    <!-- Estadísticas Principales -->
+    {% if entregas %}
+    <div class="stats-container">
+        {% if filtros.vista == 'por_cliente' %}
+            <!-- ✅ TARJETA CLICABLE: Total Clientes -->
+            <div class="stat-card info" onclick="verDetalleEstadistica('total_clientes')" style="cursor: pointer;">
+                <h3>Total Clientes</h3>
+                <div class="number">{{ entregas|length }}</div>
+                <div class="subtitle">Clientes con entregas registradas</div>
+            </div>
+            
+            <!-- ✅ TARJETA CLICABLE: Total Entregas -->
+            <div class="stat-card success" onclick="verDetalleEstadistica('total_entregas')" style="cursor: pointer;">
+                <h3>Total Entregas</h3>
+                <div class="number">{{ estadisticas.total_movimientos|default:"0" }}</div>
+                <div class="subtitle">Movimientos de entrega realizados</div>
+            </div>
+            
+            <!-- ✅ TARJETA CLICABLE: Productos Diferentes -->
+            <div class="stat-card warning" onclick="verDetalleEstadistica('total_productos')" style="cursor: pointer;">
+                <h3>Productos Diferentes</h3>
+                <div class="number">{{ estadisticas.total_productos_diferentes|default:"0" }}</div>
+                <div class="subtitle">Tipos de productos entregados</div>
+            </div>
+            
+            <!-- ✅ TARJETA CLICABLE: Cantidad Total -->
+            <div class="stat-card info" onclick="verDetalleEstadistica('cantidad_total')" style="cursor: pointer;">
+                <h3>Cantidad Total</h3>
+                <div class="number">{{ estadisticas.cantidad_total|floatformat:"-2"|default:"0" }}</div>
+                <div class="subtitle">Unidades totales entregadas</div>
+            </div>
+            
+        {% elif filtros.vista == 'productos_top' %}
+            <!-- ✅ TARJETAS CLICABLES PARA VISTA PRODUCTOS_TOP -->
+            <div class="stat-card warning" onclick="verDetalleEstadistica('total_productos')" style="cursor: pointer;">
+                <h3>Productos Entregados</h3>
+                <div class="number">{{ entregas|length }}</div>
+                <div class="subtitle">Diferentes productos distribuidos</div>
+            </div>
+            
+            <div class="stat-card info" onclick="verDetalleEstadistica('total_clientes')" style="cursor: pointer;">
+                <h3>Total Clientes</h3>
+                <div class="number">{{ estadisticas.total_clientes|default:"0" }}</div>
+                <div class="subtitle">Clientes que recibieron productos</div>
+            </div>
+            
+            <div class="stat-card success" onclick="verDetalleEstadistica('total_entregas')" style="cursor: pointer;">
+                <h3>Total Entregas</h3>
+                <div class="number">{{ estadisticas.total_entregas|default:"0" }}</div>
+                <div class="subtitle">Movimientos totales registrados</div>
+            </div>
+            
+            <div class="stat-card info" onclick="verDetalleEstadistica('cantidad_total')" style="cursor: pointer;">
+                <h3>Cantidad Total</h3>
+                <div class="number">{{ estadisticas.cantidad_total|floatformat:"-2"|default:"0" }}</div>
+                <div class="subtitle">Unidades totales distribuidas</div>
+            </div>
+            
+        {% else %}
+            <!-- ✅ TARJETAS CLICABLES PARA VISTA DETALLADA -->
+            <div class="stat-card info" onclick="verDetalleEstadistica('total_registros')" style="cursor: pointer;">
+                <h3>Total Registros</h3>
+                <div class="number">{{ entregas|length }}</div>
+                <div class="subtitle">Combinaciones cliente-producto únicas</div>
+            </div>
+            
+            <div class="stat-card success" onclick="verDetalleEstadistica('cantidad_total')" style="cursor: pointer;">
+                <h3>Cantidad Entregada</h3>
+                <div class="number">{{ estadisticas.cantidad_total|floatformat:"-2"|default:"0" }}</div>
+                <div class="subtitle">Unidades totales entregadas</div>
+            </div>
+            
+            <div class="stat-card warning" onclick="verDetalleEstadistica('total_clientes')" style="cursor: pointer;">
+                <h3>Total Clientes</h3>
+                <div class="number">{{ estadisticas.total_clientes_unicos|default:"0" }}</div>
+                <div class="subtitle">Clientes únicos atendidos</div>
+            </div>
+            
+            <div class="stat-card info" onclick="verDetalleEstadistica('total_productos')" style="cursor: pointer;">
+                <h3>Total Productos</h3>
+                <div class="number">{{ estadisticas.total_productos_unicos|default:"0" }}</div>
+                <div class="subtitle">Productos únicos entregados</div>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Filtros Mejorados -->
+    <div class="filters-container">
+        <form method="get" action="" id="filterForm">
+            <div class="vista-tabs">
+                <button type="button" class="vista-tab {% if filtros.vista == 'detallado' %}active{% endif %}" 
+                        onclick="cambiarVista('detallado')">
+                    📋 Vista Detallada
+                </button>
+                <button type="button" class="vista-tab {% if filtros.vista == 'por_cliente' %}active{% endif %}" 
+                        onclick="cambiarVista('por_cliente')">
+                    👥 Resumen por Cliente
+                </button>
+                <button type="button" class="vista-tab {% if filtros.vista == 'productos_top' %}active{% endif %}" 
+                        onclick="cambiarVista('productos_top')">
+                    📦 Resumen por Productos Entregados
+                </button>
+            </div>
+            
+            <input type="hidden" name="vista" id="vista" value="{{ filtros.vista }}">
+            
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="fecha_inicio">{% trans "Fecha Inicio" %}:</label>
+                    <input type="date" name="fecha_inicio" id="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="fecha_fin">{% trans "Fecha Fin" %}:</label>
+                    <input type="date" name="fecha_fin" id="fecha_fin" value="{{ filtros.fecha_fin }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="cliente">{% trans "Cliente" %}:</label>
+                    <select name="cliente" id="cliente">
+                        <option value="">👥 Todos los Clientes</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" {% if filtros.cliente|stringformat:"s" == cliente.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cliente.codigo }} - {{ cliente.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row" id="filtros-adicionales">
+                <div class="filter-group">
+                    <label for="categoria">{% trans "Categoría" %}:</label>
+                    <select name="categoria" id="categoria">
+                        <option value="">📂 Todas las Categorías</option>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id }}" {% if filtros.categoria|stringformat:"s" == categoria.id|stringformat:"s" %}selected{% endif %}>
+                            {{ categoria.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="producto">{% trans "Producto" %}:</label>
+                    <select name="producto" id="producto">
+                        <option value="">📦 Todos los Productos</option>
+                        {% for producto in productos %}
+                        <option value="{{ producto.id }}" {% if filtros.producto|stringformat:"s" == producto.id|stringformat:"s" %}selected{% endif %}>
+                            {{ producto.codigo }} - {{ producto.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>{% trans "Filtros Especiales" %}:</label>
+                <div class="filter-checkbox-group">
+                    <input type="checkbox" name="mostrar_todos" id="mostrar_todos" value="1" {% if filtros.mostrar_todos %}checked{% endif %}>
+                    <label for="mostrar_todos">📋 Mostrar todos los productos (incluso sin movimientos)</label>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    Filtrar
+                </button>
+                <a href="?" class="btn btn-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Limpiar Filtros
+                </a>
+                <a href="{% url 'admin:reportes_entregas_exportar_excel' %}?{{ request.GET.urlencode }}" 
+                   class="btn btn-success">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Exportar Excel
+                </a>
+                <a href="{% url 'admin:reportes_entregas_exportar_csv' %}?{{ request.GET.urlencode }}" 
+                   class="btn btn-success">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Exportar CSV
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- ✅ AGREGAR AQUÍ - CONTROLES DE PAGINACIÓN SUPERIOR -->
+{% if entregas %}
+<div class="pagination-controls-top" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+    
+    <!-- Selector de items por página -->
+    <div class="items-per-page" style="display: flex; align-items: center; gap: 10px;">
+        <label for="items-select" style="font-weight: 600; color: #495057;">Mostrar:</label>
+        <select id="items-select" onchange="changeItemsPerPage(this.value)" 
+                style="padding: 5px 10px; height: 35px; border: 2px solid #ced4da; border-radius: 4px; font-size: 14px; background: white; cursor: pointer; line-height: 1.5;">
+            <option value="50" {% if items_por_pagina == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if items_por_pagina == 100 %}selected{% endif %}>100</option>
+            <option value="200" {% if items_por_pagina == 200 %}selected{% endif %}>200</option>
+            <option value="500" {% if items_por_pagina == 500 %}selected{% endif %}>500</option>
+        </select>
+        <span style="color: #6c757d; font-size: 14px;">registros por página</span>
+    </div>
+    
+    <!-- Info de página actual -->
+    <div class="page-info" style="color: #495057; font-weight: 600; font-size: 14px; background: white; padding: 8px 16px; border-radius: 4px; border: 2px solid #e9ecef;">
+        📊 Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+    </div>
+    
+    <!-- Navegación de páginas -->
+    <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+        {% if page_obj.has_previous %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">
+                ⏮️ Primera
+            </a>
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">
+                ⬅️ Anterior
+            </a>
+        {% else %}
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+        {% endif %}
+        
+        <span style="padding: 8px 14px; background: #27ae60; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+            📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">
+                Siguiente ➡️
+            </a>
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+               style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">
+                Última ⏭️
+            </a>
+        {% else %}
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+            <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Tabla de Resultados -->
+<div class="table-container">
+    <h2>
+        {% if filtros.vista == 'por_cliente' %}
+            👥 Resumen por Cliente
+        {% elif filtros.vista == 'productos_top' %}
+            📦 Todos los Productos Entregados
+        {% else %}
+            📋 Entregas Detalladas por Cliente y Producto
+        {% endif %}
+    </h2>
+    
+    {% if entregas %}
+    <table class="entregas-table">
+        <thead>
+            <tr>
+                {% if filtros.vista == 'detallado' %}
+                    <th>CLIENTE</th>
+                    <th>CÓD. CLIENTE</th>
+                    <th>CÓD. PRODUCTO</th>
+                    <th>PRODUCTO</th>
+                    <th>CATEGORÍA</th>
+                    <th>UNIDAD</th>
+                    <th class="text-right">ENTREGAS</th>
+                    <th class="text-right">CANT. ENTRADA</th>
+                    <th class="text-right">CANT. SALIDA</th>
+                    <th class="text-right">TRASL. ORIGEN</th>
+                    <th class="text-right">TRASL. DESTINO</th>
+                    
+                    <th class="text-right">STOCK BUENO</th>
+                    <th class="text-right">STOCK DAÑADO</th>
+                    <th class="text-right">STOCK TOTAL</th>
+                    <th class="text-center">ACCIONES</th>
+
+                {% elif filtros.vista == 'por_cliente' %}
+                    <th>CLIENTE</th>
+                    <th>CÓDIGO</th>
+                    <th>DIRECCIÓN</th>
+                    <th>TELÉFONO</th>
+                    <th class="text-right">ENTREGAS</th>
+                    <th class="text-right">PRODUCTOS</th>
+                    <th class="text-right">CANTIDAD TOTAL</th>
+                    <th class="text-center">ACCIONES</th>
+                
+                {% else %} <th class="text-center">#</th>
+                    <th>CÓDIGO</th>
+                    <th>PRODUCTO</th>
+                    <th>CATEGORÍA</th>
+                    <th>UNIDAD</th>
+                    <th class="text-right">CLIENTES</th>
+                    <th class="text-right">ENTREGAS</th>
+                    <th class="text-right">CANTIDAD TOTAL</th>
+                    <th class="text-center">ACCIONES</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in entregas %}
+            <tr>
+                {% if filtros.vista == 'detallado' %}
+                    <td><strong>{{ item.cliente_nombre }}</strong></td>
+                    <td><span class="codigo-cliente-badge">{{ item.cliente_codigo }}</span></td>
+                    <td><span class="codigo-producto-badge">{{ item.producto_codigo }}</span></td>
+                    <td><strong>{{ item.producto_nombre }}</strong></td>
+                    <td>{{ item.producto_categoria|default:"-" }}</td>
+                    <td>{{ item.producto_unidad }}</td>
+                    <td class="text-right"><span class="badge badge-primary">{{ item.total_entregas }}</span></td>
+                    <td class="text-right" style="color: #27ae60; font-weight: 600;">{{ item.cantidad_entrada|floatformat:2 }}</td>
+                    <td class="text-right" style="color: #e74c3c; font-weight: 600;">{{ item.cantidad_salida|floatformat:2 }}</td>
+                    
+                    <td class="text-right" style="color: #e67e22; font-weight: 600;">-{{ item.cantidad_traslado_origen|floatformat:2 }}</td>
+                    <td class="text-right" style="color: #3498db; font-weight: 600;">+{{ item.cantidad_traslado_destino|floatformat:2 }}</td>
+                    
+                    <td class="text-right stock-bueno">{{ item.stock_bueno|floatformat:2 }}</td>
+                    <td class="text-right stock-danado">{{ item.stock_danado|floatformat:2 }}</td>
+                    <td class="text-right"><span class="stock-total">{{ item.stock_total|floatformat:2 }}</span></td>
+                    <td class="text-center">
+                        <button class="btn-ver-detalle" onclick="verDetalleEntregaCliente('{{ item.cliente_id }}', '{{ item.producto_id }}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            Ver Detalle
+                        </button>
+                    </td>
+
+                {% elif filtros.vista == 'por_cliente' %}
+                    <td><strong>{{ item.cliente_nombre }}</strong></td>
+                    <td><span class="codigo-cliente-badge">{{ item.cliente_codigo }}</span></td>
+                    <td>{{ item.cliente_direccion }}</td>
+                    <td>{{ item.cliente_telefono }}</td>
+                    <td class="text-right"><span class="badge badge-primary">{{ item.total_entregas }}</span></td>
+                    <td class="text-right">{{ item.total_productos }}</td>
+                    <td class="text-right"><strong>{{ item.cantidad_total|floatformat:2 }}</strong></td>
+                    <td class="text-center">
+                        <button class="btn-ver-detalle" onclick="verProductosCliente('{{ item.cliente_id }}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
+                            Ver Productos
+                        </button>
+                    </td>
+                    
+                {% else %} <td class="text-center"><strong>{{ forloop.counter }}</strong></td>
+                    <td><span class="codigo-producto-badge">{{ item.producto_codigo }}</span></td>
+                    <td><strong>{{ item.producto_nombre }}</strong></td>
+                    <td>{{ item.producto_categoria }}</td>
+                    <td>{{ item.producto_unidad }}</td>
+                    <td class="text-right">{{ item.total_clientes }}</td>
+                    <td class="text-right"><span class="badge badge-success">{{ item.total_entregas }}</span></td>
+                    <td class="text-right"><strong>{{ item.cantidad_total|floatformat:2 }}</strong></td>
+                    <td class="text-center">
+                        <button class="btn-ver-detalle" onclick="verClientesProducto('{{ item.producto_id }}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Ver Clientes
+                        </button>
+                    </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- ✅ AGREGAR AQUÍ - CONTROLES DE PAGINACIÓN INFERIOR -->
+    {% if entregas %}
+    <div class="pagination-controls-bottom" style="margin: 20px 0 0 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-top: 3px solid #667eea;">
+        
+        <!-- Info de página actual -->
+        <div class="page-info" style="color: #495057; font-weight: 600; font-size: 14px; background: white; padding: 8px 16px; border-radius: 4px; border: 2px solid #e9ecef;">
+            📊 Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+        </div>
+        
+        <!-- Navegación de páginas -->
+        <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+            {% if page_obj.has_previous %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+                   style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                    ⏮️ Primera
+                </a>
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+                   style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                    ⬅️ Anterior
+                </a>
+            {% else %}
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+            {% endif %}
+            
+            <span style="padding: 8px 14px; background: #27ae60; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+                📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+            </span>
+            
+            {% if page_obj.has_next %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+                   style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                    Siguiente ➡️
+                </a>
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+                   style="padding: 8px 14px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                    Última ⏭️
+                </a>
+            {% else %}
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+                <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="no-data">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#95a5a6" stroke-width="2" style="margin-bottom: 15px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p><strong>No se encontraron entregas con los filtros seleccionados</strong></p>
+        <p style="font-size: 14px; margin-top: 10px;">Intenta ajustar los filtros o limpiar la búsqueda</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Resúmenes Laterales -->
+<div class="summaries-grid">
+    <!-- Top 10 Productos -->
+    {% if productos_top %}
+    <div class="sidebar-summary">
+        <h3>🏆 Top 10 Productos Más Entregados</h3>
+        {% for producto in productos_top %}
+        <div class="top-item">
+            <span class="rank">{{ forloop.counter }}</span>
+            <div class="info">
+                <span class="name">{{ producto.producto__nombre }}</span>
+                <span class="detail">{{ producto.producto__codigo }} | {{ producto.total_clientes }} cliente(s)</span>
+            </div>
+            <div class="value">
+                <span class="main">{{ producto.cantidad_total|floatformat:2 }}</span>
+                <span class="sub">{{ producto.producto__unidad_medida__abreviatura }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Top 10 Clientes -->
+    {% if resumen_clientes %}
+    <div class="sidebar-summary">
+        <h3>👥 Top 10 Clientes por Cantidad</h3>
+        {% for cliente in resumen_clientes %}
+        <div class="cliente-item">
+            <div>
+                <div class="cliente-name">{{ cliente.movimiento__cliente__nombre }}</div>
+                <small style="color: #666;">{{ cliente.total_entregas }} entrega(s) | {{ cliente.total_productos }} producto(s)</small>
+            </div>
+            <div class="cliente-value">
+                {{ cliente.cantidad_total|floatformat:2 }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal para Detalles -->
+<div id="modal-detalle" class="entregas-modal" style="display: none;">
+    <div class="modal-overlay" onclick="cerrarModalDetalle()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="detalle-titulo">Detalle de Entregas</h3>
+            <button class="modal-close" onclick="cerrarModalDetalle()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="detalle-contenido">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-info" onclick="cerrarModalDetalle()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+<script>
+
+function cambiarVista(vista) {
+    document.getElementById('vista').value = vista;
+    document.getElementById('filterForm').submit();
+}
+
+// Mostrar/ocultar filtros adicionales según la vista
+document.addEventListener('DOMContentLoaded', function() {
+    const vista = document.getElementById('vista').value;
+    const filtrosAdicionales = document.getElementById('filtros-adicionales');
+    
+    // Mostrar los filtros solo en vista detallada y productos_top
+    if (vista === 'detallado' || vista === 'productos_top') {
+        filtrosAdicionales.style.display = 'grid';
+    } else {
+        // Vista por_cliente - ocultar filtros
+        filtrosAdicionales.style.display = 'none';
+    }
+});
+
+function verDetalleEntrega(clienteId, productoId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Detalle de Entregas - Cliente y Producto';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando información detallada...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Obtener parámetros de fecha de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fechaInicio = urlParams.get('fecha_inicio') || '';
+    const fechaFin = urlParams.get('fecha_fin') || '';
+    
+    // Hacer petición AJAX para obtener los detalles
+    fetch(`/reportes/obtener-detalle-entrega/?cliente_id=${clienteId}&producto_id=${productoId}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>👤 Cliente: ' + data.cliente.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.cliente.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Dirección:</span><span class="detalle-value">' + (data.cliente.direccion || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Teléfono:</span><span class="detalle-value">' + (data.cliente.telefono || '-') + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📦 Producto: ' + data.producto.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.producto.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Categoría:</span><span class="detalle-value">' + (data.producto.categoria || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Unidad:</span><span class="detalle-value">' + data.producto.unidad + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📊 Resumen de Entregas</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Total de Entregas:</span><span class="detalle-value">' + data.resumen.total_entregas + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Total:</span><span class="detalle-value">' + parseFloat(data.resumen.cantidad_total).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Buena:</span><span class="detalle-value cantidad-buena">' + parseFloat(data.resumen.cantidad_buena).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Dañada:</span><span class="detalle-value cantidad-danada">' + parseFloat(data.resumen.cantidad_danada).toFixed(2) + '</span></div>';
+                html += '</div>';
+                
+                if (data.movimientos && data.movimientos.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📋 Detalle de Movimientos (' + data.movimientos.length + ' registros)</h4>';
+                    html += '<div style="max-height: 400px; overflow-y: auto;">';
+                    
+                    data.movimientos.forEach(function(mov) {
+                        html += '<div class="movimiento-mini">';
+                        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">';
+                        html += '<span style="font-size: 11px; color: #95a5a6; text-transform: uppercase; letter-spacing: 0.5px;">N° Movimiento</span>';
+                        html += '<span style="font-weight: 700; color: #2c3e50; font-size: 13px;">' + mov.numero_movimiento + '</span>';
+                        html += '</div>';
+                        
+                        html += '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">';
+                        html += '<span style="font-weight: 700; color: #667eea;">📤 ' + mov.tipo + '</span>';
+                        html += '<span style="font-size: 12px; color: #7f8c8d;">' + mov.fecha + '</span>';
+                        html += '</div>';
+                        
+                        html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">';
+                        html += '<div><strong>Cantidad:</strong> ' + parseFloat(mov.cantidad).toFixed(2) + '</div>';
+                        html += '<div><strong>Estado:</strong> ' + mov.estado + '</div>';
+                        
+                        if (mov.cantidad_buena && parseFloat(mov.cantidad_buena) > 0) {
+                            html += '<div><strong>Buena:</strong> <span style="color: #27ae60;">' + parseFloat(mov.cantidad_buena).toFixed(2) + '</span></div>';
+                        }
+                        if (mov.cantidad_danada && parseFloat(mov.cantidad_danada) > 0) {
+                            html += '<div><strong>Dañada:</strong> <span style="color: #e74c3c;">' + parseFloat(mov.cantidad_danada).toFixed(2) + '</span></div>';
+                        }
+                        
+                        if (mov.almacen) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Almacén:</strong> ' + mov.almacen + '</div>';
+                        }
+                        
+                        if (mov.observaciones) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Observaciones:</strong> ' + mov.observaciones + '</div>';
+                        }
+                        
+                        html += '</div></div>';
+                    });
+                    
+                    html += '</div></div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay movimientos registrados para este cliente y producto en el período seleccionado</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function cerrarModalDetalle() {
+    var modal = document.getElementById('modal-detalle');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// Cerrar modal con tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalDetalle();
+    }
+});
+
+function verDetalleEntregaCliente(clienteId, productoId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Detalle de Entregas - Cliente y Producto';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando información detallada...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Obtener parámetros de fecha de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fechaInicio = urlParams.get('fecha_inicio') || '';
+    const fechaFin = urlParams.get('fecha_fin') || '';
+    
+    // Hacer petición AJAX para obtener los detalles
+    fetch(`obtener-detalle-entrega/?cliente_id=${clienteId}&producto_id=${productoId}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>👤 Cliente: ' + data.cliente.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.cliente.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Dirección:</span><span class="detalle-value">' + (data.cliente.direccion || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Teléfono:</span><span class="detalle-value">' + (data.cliente.telefono || '-') + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📦 Producto: ' + data.producto.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.producto.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Categoría:</span><span class="detalle-value">' + (data.producto.categoria || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Unidad:</span><span class="detalle-value">' + data.producto.unidad + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📊 Resumen de Entregas</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Total de Entregas:</span><span class="detalle-value">' + data.resumen.total_entregas + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Total:</span><span class="detalle-value">' + parseFloat(data.resumen.cantidad_total).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Buena:</span><span class="detalle-value cantidad-buena">' + parseFloat(data.resumen.cantidad_buena).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Cantidad Dañada:</span><span class="detalle-value cantidad-danada">' + parseFloat(data.resumen.cantidad_danada).toFixed(2) + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📋 Por Tipo de Movimiento</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Entradas:</span><span class="detalle-value" style="color: #27ae60;">+' + parseFloat(data.resumen.cantidad_entrada).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Salidas:</span><span class="detalle-value" style="color: #e74c3c;">-' + parseFloat(data.resumen.cantidad_salida).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Traslados:</span><span class="detalle-value" style="color: #3498db;">' + parseFloat(data.resumen.cantidad_traslado).toFixed(2) + '</span></div>';
+                html += '</div>';
+                
+                html += '<div class="detalle-estadistica-card">';
+                html += '<h4>📊 Stock Actual</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Stock Bueno:</span><span class="detalle-value cantidad-buena">' + parseFloat(data.resumen.stock_bueno).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Stock Dañado:</span><span class="detalle-value cantidad-danada">' + parseFloat(data.resumen.stock_danado).toFixed(2) + '</span></div>';
+                html += '<div class="detalle-item" style="border-top: 2px solid #667eea; margin-top: 10px; padding-top: 10px;"><span class="detalle-label" style="font-size: 16px;">STOCK TOTAL:</span><span class="detalle-value" style="font-size: 18px; color: #667eea;">' + parseFloat(data.resumen.stock_total).toFixed(2) + '</span></div>';
+                html += '</div>';
+                
+                if (data.movimientos && data.movimientos.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📋 Detalle de Movimientos (' + data.movimientos.length + ' registros)</h4>';
+                    html += '<div style="max-height: 400px; overflow-y: auto;">';
+                    
+                    data.movimientos.forEach(function(mov) {
+                        var tipoNormalizado = mov.tipo.toUpperCase();
+    
+                        var tipoColor = tipoNormalizado.includes('ENTRADA') ? '#27ae60' : 
+                                        (tipoNormalizado.includes('SALIDA') ? '#e74c3c' : '#3498db');
+    
+                        var tipoIcon = tipoNormalizado.includes('ENTRADA') ? '⬇️' : 
+                                        (tipoNormalizado.includes('SALIDA') ? '⬆️' : '🔄');
+                        
+                        html += '<div class="movimiento-mini" style="border-left: 3px solid ' + tipoColor + ';">';
+                        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">';
+                        html += '<span style="font-size: 11px; color: #95a5a6; text-transform: uppercase; letter-spacing: 0.5px;">N° Movimiento</span>';
+                        html += '<span style="font-weight: 700; color: #2c3e50; font-size: 13px;">' + mov.numero_movimiento + '</span>';
+                        html += '</div>';
+                        
+                        html += '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">';
+                        html += '<span style="font-weight: 700; color: ' + tipoColor + ';">' + tipoIcon + ' ' + mov.tipo + '</span>';
+                        html += '<span style="font-size: 12px; color: #7f8c8d;">' + mov.fecha + '</span>';
+                        html += '</div>';
+                        
+                        html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">';
+                        html += '<div><strong>Cantidad:</strong> ' + parseFloat(mov.cantidad).toFixed(2) + '</div>';
+                        html += '<div><strong>Estado:</strong> ' + mov.estado + '</div>';
+                        
+                        if (mov.cantidad_buena && parseFloat(mov.cantidad_buena) > 0) {
+                            html += '<div><strong>Buena:</strong> <span style="color: #27ae60;">' + parseFloat(mov.cantidad_buena).toFixed(2) + '</span></div>';
+                        }
+                        if (mov.cantidad_danada && parseFloat(mov.cantidad_danada) > 0) {
+                            html += '<div><strong>Dañada:</strong> <span style="color: #e74c3c;">' + parseFloat(mov.cantidad_danada).toFixed(2) + '</span></div>';
+                        }
+                        
+                        if (mov.almacen) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Almacén:</strong> ' + mov.almacen + '</div>';
+                        }
+                        
+                        // ✅ NUEVO: Mostrar cliente origen y destino en traslados
+                        if (mov.cliente_origen) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Cliente Origen:</strong> <span style="color: #e74c3c;">🔴 ' + mov.cliente_origen + '</span></div>';
+                        }
+                        
+                        if (mov.cliente_destino) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Cliente Destino:</strong> <span style="color: #27ae60;">🟢 ' + mov.cliente_destino + '</span></div>';
+                        }
+                        
+                        if (mov.proveedor) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Proveedor:</strong> ' + mov.proveedor + '</div>';
+                        }
+                        
+                        if (mov.recepcionista) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Recepcionista:</strong> ' + mov.recepcionista + '</div>';
+                        }
+                        
+                        if (mov.observaciones) {
+                            html += '<div style="grid-column: 1 / -1;"><strong>Observaciones:</strong> ' + mov.observaciones + '</div>';
+                        }
+                        
+                        html += '</div></div>';
+                    });
+                    
+                    html += '</div></div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay movimientos registrados para este cliente y producto en el período seleccionado</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function verProductosCliente(clienteId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Productos del Cliente';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando productos del cliente...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Obtener parámetros de fecha de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fechaInicio = urlParams.get('fecha_inicio') || '';
+    const fechaFin = urlParams.get('fecha_fin') || '';
+    
+    // Hacer petición AJAX para obtener los productos del cliente
+    // ✅ CORRECCIÓN: Usar ruta relativa correcta
+    fetch(`obtener-productos-cliente/?cliente_id=${clienteId}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+        .then(response => {
+            // ✅ AGREGAR: Verificar si la respuesta es exitosa
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>👤 ' + data.cliente.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.cliente.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Dirección:</span><span class="detalle-value">' + (data.cliente.direccion || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Teléfono:</span><span class="detalle-value">' + (data.cliente.telefono || '-') + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Productos Diferentes:</span><span class="detalle-value">' + data.total_productos + '</span></div>';
+                html += '</div>';
+                
+                if (data.productos && data.productos.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📦 Listado de Productos</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    // Crear tabla de productos
+                    html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                    html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                    html += '<tr>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Código</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Producto</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Categoría</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Unidad</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Entregas</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cant. Buena</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cant. Dañada</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cantidad Total</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Acciones</th>';
+                    html += '</tr>';
+                    html += '</thead>';
+                    html += '<tbody>';
+                    
+                    data.productos.forEach(function(prod, index) {
+                        var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                        html += '<tr style="background: ' + bgColor + ';">';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;"><span class="codigo-producto-badge">' + prod.codigo + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">' + prod.nombre + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;">' + prod.categoria + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + prod.unidad + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right;"><span class="badge badge-primary">' + prod.total_entregas + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #27ae60; font-weight: 700;">' + parseFloat(prod.cantidad_buena).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #e74c3c; font-weight: 700;">' + parseFloat(prod.cantidad_danada).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: 700; color: #3498db;">' + parseFloat(prod.cantidad_total).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">';
+                        html += '<button onclick="verDetalleEntregaCliente(\'' + data.cliente.id + '\', \'' + prod.producto_id + '\')" style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📊 Ver Detalle</button>';
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody>';
+                    html += '</table>';
+                    html += '</div>';
+                    
+                    // Resumen final
+                    html += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white;">';
+                    html += '<h5 style="margin: 0 0 10px 0; font-size: 14px;">📈 Resumen General del Cliente</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Productos Diferentes</div><div style="font-size: 20px; font-weight: 700;">' + data.total_productos + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Total Entregas</div><div style="font-size: 20px; font-weight: 700;">' + data.totales.total_entregas + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Cant. Buena</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.cantidad_buena).toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Cantidad Total</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.cantidad_total).toFixed(2) + '</div></div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay productos entregados a este cliente en el período seleccionado</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los productos: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los productos. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function verClientesProducto(productoId) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    titulo.textContent = 'Clientes del Producto';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando clientes del producto...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Obtener parámetros de fecha de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fechaInicio = urlParams.get('fecha_inicio') || '';
+    const fechaFin = urlParams.get('fecha_fin') || '';
+    
+    // Hacer petición AJAX
+    fetch(`obtener-clientes-producto/?producto_id=${productoId}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                var html = '<div class="detalle-estadistica-card">';
+                html += '<h4>📦 ' + data.producto.nombre + '</h4>';
+                html += '<div class="detalle-item"><span class="detalle-label">Código:</span><span class="detalle-value">' + data.producto.codigo + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Categoría:</span><span class="detalle-value">' + data.producto.categoria + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Unidad:</span><span class="detalle-value">' + data.producto.unidad + '</span></div>';
+                html += '<div class="detalle-item"><span class="detalle-label">Clientes Atendidos:</span><span class="detalle-value">' + data.total_clientes + '</span></div>';
+                html += '</div>';
+                
+                if (data.clientes && data.clientes.length > 0) {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>👥 Listado de Clientes</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    // Crear tabla de clientes
+                    html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                    html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                    html += '<tr>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Código</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Cliente</th>';
+                    html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Dirección</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Teléfono</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Entregas</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cant. Buena</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cant. Dañada</th>';
+                    html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cantidad Total</th>';
+                    html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Acciones</th>';
+                    html += '</tr>';
+                    html += '</thead>';
+                    html += '<tbody>';
+                    
+                    data.clientes.forEach(function(cli, index) {
+                        var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                        html += '<tr style="background: ' + bgColor + ';">';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;"><span class="codigo-cliente-badge">' + cli.codigo + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">' + cli.nombre + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd;">' + (cli.direccion || '-') + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + (cli.telefono || '-') + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right;"><span class="badge badge-primary">' + cli.total_entregas + '</span></td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #27ae60; font-weight: 700;">' + parseFloat(cli.cantidad_buena).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #e74c3c; font-weight: 700;">' + parseFloat(cli.cantidad_danada).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: 700; color: #3498db;">' + parseFloat(cli.cantidad_total).toFixed(2) + '</td>';
+                        html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">';
+                        html += '<button onclick="verDetalleEntregaCliente(\'' + cli.cliente_id + '\', \'' + data.producto.id + '\')" style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📊 Ver Detalle</button>';
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody>';
+                    html += '</table>';
+                    html += '</div>';
+                    
+                    // Resumen final
+                    html += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; color: white;">';
+                    html += '<h5 style="margin: 0 0 10px 0; font-size: 14px;">📈 Resumen General del Producto</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Clientes Atendidos</div><div style="font-size: 20px; font-weight: 700;">' + data.total_clientes + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Total Entregas</div><div style="font-size: 20px; font-weight: 700;">' + data.totales.total_entregas + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Cant. Buena</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.cantidad_buena).toFixed(2) + '</div></div>';
+                    html += '<div><div style="font-size: 11px; opacity: 0.9;">Cantidad Total</div><div style="font-size: 20px; font-weight: 700;">' + parseFloat(data.totales.cantidad_total).toFixed(2) + '</div></div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                } else {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay clientes que recibieron este producto en el período seleccionado</p>';
+                    html += '</div>';
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los clientes: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los clientes. Por favor, intente nuevamente.</p></div>';
+        });
+}
+
+function verDetalleEstadistica(tipo) {
+    var modal = document.getElementById('modal-detalle');
+    var titulo = document.getElementById('detalle-titulo');
+    var contenido = document.getElementById('detalle-contenido');
+    
+    // Títulos según tipo
+    var titulos = {
+        'total_clientes': '📊 Detalle de Clientes',
+        'total_entregas': '📦 Detalle de Entregas',
+        'total_productos': '🏷️ Detalle de Productos',
+        'cantidad_total': '📈 Detalle de Cantidades',
+        'total_registros': '📋 Detalle de Registros'
+    };
+    
+    titulo.textContent = titulos[tipo] || 'Detalle';
+    contenido.innerHTML = '<p style="text-align: center; padding: 40px;">⏳ Cargando información...</p>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Obtener parámetros de filtro
+    const urlParams = new URLSearchParams(window.location.search);
+    const fechaInicio = urlParams.get('fecha_inicio') || '';
+    const fechaFin = urlParams.get('fecha_fin') || '';
+    const vista = urlParams.get('vista') || 'detallado';
+    
+    // ✅ CASO ESPECIAL: Vista detallada con información local
+    if (vista === 'detallado' && tipo === 'total_registros') {
+        var html = '<div class="detalle-estadistica-card">';
+        html += '<h4>📋 Información de Registros</h4>';
+        html += '<div class="detalle-item">';
+        html += '<span class="detalle-label">Total de registros:</span>';
+        html += '<span class="detalle-value">{{ entregas|length }}</span>';
+        html += '</div>';
+        html += '<div class="detalle-item">';
+        html += '<span class="detalle-label">Vista actual:</span>';
+        html += '<span class="detalle-value">Detallada (Cliente-Producto)</span>';
+        html += '</div>';
+        html += '<p style="margin-top: 20px; color: #666; font-size: 14px;">Esta vista muestra todas las combinaciones únicas de cliente y producto con sus respectivos movimientos.</p>';
+        html += '</div>';
+        
+        contenido.innerHTML = html;
+        return; // Salir sin hacer llamada AJAX
+    }
+    
+    // Llamada AJAX para otros casos
+    fetch(`obtener-detalle-estadistica-entregas/?tipo=${tipo}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                var html = '';
+                
+                // ========== TOTAL CLIENTES ==========
+                if (tipo === 'total_clientes') {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>👥 Total de Clientes: ' + data.total_clientes + '</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    if (data.clientes && data.clientes.length > 0) {
+                        html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                        html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                        html += '<tr>';
+                        html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Código</th>';
+                        html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Cliente</th>';
+                        html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Movimientos</th>';
+                        html += '<th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Productos</th>';
+                        html += '</tr>';
+                        html += '</thead>';
+                        html += '<tbody>';
+                        
+                        data.clientes.forEach(function(cliente, index) {
+                            var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                            html += '<tr style="background: ' + bgColor + ';">';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd;"><span class="codigo-cliente-badge">' + cliente.codigo + '</span></td>';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">' + cliente.nombre + '</td>';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;"><span class="badge badge-primary">' + cliente.total_movimientos + '</span></td>';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + cliente.total_productos + '</td>';
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody></table>';
+                    } else {
+                        html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay clientes registrados</p>';
+                    }
+                    
+                    html += '</div></div>';
+                }
+                
+                // ========== TOTAL ENTREGAS ==========
+                else if (tipo === 'total_entregas') {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📦 Total de Entregas: ' + data.total_entregas + '</h4>';
+                    html += '</div>';
+                    
+                    // Por tipo
+                    if (data.por_tipo && data.por_tipo.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📊 Por Tipo de Movimiento</h4>';
+                        data.por_tipo.forEach(function(item) {
+                            html += '<div class="detalle-item">';
+                            html += '<span class="detalle-label">' + item.tipo + ':</span>';
+                            html += '<span class="detalle-value">' + item.total + '</span>';
+                            html += '</div>';
+                        });
+                        html += '</div>';
+                    }
+                    
+                    // Por mes
+                    if (data.por_mes && data.por_mes.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📅 Últimos Meses</h4>';
+                        data.por_mes.forEach(function(item) {
+                            html += '<div class="detalle-item">';
+                            html += '<span class="detalle-label">' + item.mes + ':</span>';
+                            html += '<span class="detalle-value">' + item.total + '</span>';
+                            html += '</div>';
+                        });
+                        html += '</div>';
+                    }
+                }
+                
+                // ========== TOTAL PRODUCTOS ==========
+                else if (tipo === 'total_productos') {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>🏷️ Total de Productos: ' + data.total_productos + '</h4>';
+                    html += '<div style="max-height: 500px; overflow-y: auto;">';
+                    
+                    if (data.top_productos && data.top_productos.length > 0) {
+                        html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                        html += '<thead style="position: sticky; top: 0; background: #2c3e50; color: white; z-index: 10;">';
+                        html += '<tr>';
+                        html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Código</th>';
+                        html += '<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Producto</th>';
+                        html += '<th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Cantidad</th>';
+                        html += '</tr>';
+                        html += '</thead>';
+                        html += '<tbody>';
+                        
+                        data.top_productos.forEach(function(prod, index) {
+                            var bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                            html += '<tr style="background: ' + bgColor + ';">';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd;"><span class="codigo-producto-badge">' + prod.codigo + '</span></td>';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">' + prod.nombre + '</td>';
+                            html += '<td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: 700;">' + parseFloat(prod.cantidad).toFixed(2) + '</td>';
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody></table>';
+                    } else {
+                        html += '<p style="text-align: center; color: #95a5a6; padding: 20px;">No hay productos registrados</p>';
+                    }
+                    
+                    html += '</div></div>';
+                }
+                
+                // ========== CANTIDAD TOTAL ==========
+                else if (tipo === 'cantidad_total') {
+                    html += '<div class="detalle-estadistica-card">';
+                    html += '<h4>📈 Cantidad Total: ' + parseFloat(data.cantidad_total).toFixed(2) + '</h4>';
+                    html += '</div>';
+                    
+                    if (data.por_categoria && data.por_categoria.length > 0) {
+                        html += '<div class="detalle-estadistica-card">';
+                        html += '<h4>📊 Por Categoría</h4>';
+                        html += '<div style="max-height: 400px; overflow-y: auto;">';
+                        
+                        data.por_categoria.forEach(function(item) {
+                            html += '<div class="detalle-item">';
+                            html += '<span class="detalle-label">' + item.categoria + ':</span>';
+                            html += '<span class="detalle-value">' + parseFloat(item.cantidad).toFixed(2) + '</span>';
+                            html += '</div>';
+                        });
+                        
+                        html += '</div></div>';
+                    }
+                }
+                
+                contenido.innerHTML = html;
+            } else {
+                contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error: ' + (data.error || 'Error desconocido') + '</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            contenido.innerHTML = '<div class="detalle-estadistica-card"><p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar los detalles. Intente nuevamente.</p></div>';
+        });
+}
+
+function changeItemsPerPage(value) {
+    const url = new URL(window.location);
+    url.searchParams.set('items_por_pagina', value);
+    url.searchParams.set('page', '1');  // Resetear a página 1
+    window.location = url.toString();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Efectos hover para botones de paginación
+    const paginationLinks = document.querySelectorAll('.pagination a[href]');
+    paginationLinks.forEach(link => {
+        link.addEventListener('mouseenter', function() {
+            this.style.background = '#5568d3';
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        });
+        link.addEventListener('mouseleave', function() {
+            this.style.background = '#667eea';
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+    });
+});
+
+</script>
+{% endblock %}

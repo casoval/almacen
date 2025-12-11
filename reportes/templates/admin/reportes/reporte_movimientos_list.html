@@ -1,0 +1,1571 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+    .filters-container {
+        background: #2c3e50;
+        padding: 30px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .filter-group label {
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #ecf0f1;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 14px 16px;
+        border: 1px solid #95a5a6;
+        border-radius: 6px;
+        font-size: 15px;
+        background: #ffffff;
+        transition: all 0.3s ease;
+        width: 100%;
+        box-sizing: border-box;
+        height: 48px;
+        line-height: 1.5;
+    }
+    
+    .filter-group select {
+        cursor: pointer;
+    }
+    
+    .filter-group select option {
+        padding: 10px;
+    }
+    
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: #3498db;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 13px 26px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #229954;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-info {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-info:hover {
+        background: #7f8c8d;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: #34495e;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border-left: 4px solid #3498db;
+        cursor: pointer;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-left-color: #2980b9;
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 12px 0;
+        font-size: 12px;
+        color: #bdc3c7;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+        position: relative;
+    }
+    
+    .stat-card .number {
+        font-size: 36px;
+        font-weight: 700;
+        color: #ecf0f1;
+        position: relative;
+    }
+    
+    .table-container {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow-x: auto;
+    }
+    
+    .table-container h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #2d3748;
+        font-size: 20px;
+        font-weight: 700;
+    }
+    
+    .movimientos-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1000px;
+    }
+    
+    .movimientos-table th {
+        background: #34495e;
+        color: #ecf0f1;
+        padding: 14px 16px;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        z-index: 10;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .movimientos-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+        color: #4a5568;
+        white-space: nowrap;
+    }
+    
+    .movimientos-table tr:hover {
+        background-color: #f7fafc;
+        transition: background-color 0.2s ease;
+    }
+    
+    .movimientos-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .badge {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+    }
+    
+    .badge-entrada {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .badge-salida {
+        background: #e74c3c;
+        color: white;
+    }
+    
+    .badge-traslado {
+        background: #3498db;
+        color: white;
+    }
+    
+    .productos-top {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-top: 25px;
+    }
+    
+    .productos-top h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #2c3e50;
+        font-size: 20px;
+        font-weight: 700;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+    }
+    
+    .producto-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    
+    .producto-item:hover {
+        background: #f7fafc;
+        padding-left: 20px;
+    }
+    
+    .producto-item:last-child {
+        border-bottom: none;
+    }
+    
+    .producto-item strong {
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    .producto-item span:last-child {
+        background: #34495e;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    #content-main h1 {
+        color: #2d3748;
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 25px;
+    }
+    
+    .btn-ver-productos {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-ver-productos:hover {
+        background: #2980b9;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    
+    .btn-ver-productos svg {
+        flex-shrink: 0;
+    }
+    
+    /* Modal Styles */
+    .productos-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        max-width: 900px;
+        width: 90%;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        animation: modalSlideIn 0.3s ease;
+        border: 2px solid #e2e8f0;
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .modal-header {
+        padding: 25px 30px;
+        border-bottom: 3px solid #3498db;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .modal-header-info {
+        flex: 1;
+    }
+    
+    .modal-header h3 {
+        margin: 0 0 8px 0;
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    .modal-subtitle {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 0;
+    }
+    
+    .fecha-badge {
+        background: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .modal-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        font-size: 28px;
+        color: #ffffff;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        border-radius: 4px;
+    }
+    
+    .modal-close:hover {
+        background: #e74c3c;
+        border-color: #e74c3c;
+        transform: rotate(90deg);
+    }
+    
+    .modal-body {
+        padding: 25px;
+        overflow-y: auto;
+        flex: 1;
+        background: #f8f9fa;
+    }
+    
+    .productos-summary {
+        background: #e3f2fd;
+        border-left: 4px solid #3498db;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .summary-item {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .summary-label {
+        color: #546e7a;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    
+    .summary-value {
+        color: #3498db;
+        font-size: 20px;
+        font-weight: 700;
+    }
+    
+    .modal-footer {
+        padding: 20px 30px;
+        border-top: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        background: #ffffff;
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .modal-footer .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .modal-footer .btn svg {
+        flex-shrink: 0;
+    }
+    
+    .productos-detalle-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .productos-detalle-table thead tr {
+        background: linear-gradient(135deg, #546e7a 0%, #455a64 100%);
+    }
+    
+    .productos-detalle-table th {
+        padding: 14px 12px;
+        text-align: left;
+        font-weight: 700;
+        color: #ffffff;
+        font-size: 13px;
+        text-transform: uppercase;
+        border-bottom: 2px solid #3498db;
+        letter-spacing: 0.5px;
+    }
+    
+    .productos-detalle-table th.col-cantidad,
+    .productos-detalle-table th.col-total,
+    .productos-detalle-table th.col-unidad {
+        text-align: center;
+    }
+    
+    .productos-detalle-table td {
+        padding: 14px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        color: #2c3e50;
+        font-size: 14px;
+    }
+    
+    .productos-detalle-table tbody tr {
+        transition: background 0.2s ease;
+        background: #ffffff;
+    }
+    
+    .productos-detalle-table tbody tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    
+    .productos-detalle-table tbody tr:hover {
+        background: #e3f2fd;
+    }
+    
+    .productos-detalle-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .productos-detalle-table .col-codigo {
+        width: 120px;
+    }
+    
+    .productos-detalle-table .col-producto {
+        min-width: 200px;
+    }
+    
+    .productos-detalle-table .col-cantidad,
+    .productos-detalle-table .col-total,
+    .productos-detalle-table .col-unidad {
+        text-align: center;
+        width: 110px;
+    }
+    
+    .codigo-badge {
+        background: #3498db;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 12px;
+        display: inline-block;
+    }
+    
+    .cantidad-buena {
+        color: #27ae60;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    .cantidad-danada {
+        color: #e74c3c;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    .total-badge {
+        background: #e3f2fd;
+        color: #2980b9;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 16px;
+        display: inline-block;
+        border: 2px solid #3498db;
+    }
+    
+    .detalle-estadistica-card {
+        background: white;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 4px solid #3498db;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    .detalle-estadistica-card h4 {
+        margin: 0 0 15px 0;
+        color: #2c3e50;
+        font-size: 16px;
+        font-weight: 700;
+    }
+    
+    .detalle-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .detalle-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detalle-label {
+        color: #546e7a;
+        font-weight: 600;
+    }
+    
+    .detalle-value {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 16px;
+    }
+    
+    .detalle-movimientos-list {
+        margin-top: 15px;
+    }
+    
+    .movimiento-mini {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s ease;
+    }
+    
+    .movimiento-mini:hover {
+        background: #e3f2fd;
+    }
+    
+    .movimiento-mini-info {
+        flex: 1;
+    }
+    
+    .movimiento-mini-numero {
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 4px;
+    }
+    
+    .movimiento-mini-fecha {
+        font-size: 12px;
+        color: #546e7a;
+    }
+
+    .pagination-container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .pagination-info {
+        color: #546e7a;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .pagination-info strong {
+        color: #2c3e50;
+    }
+
+    .pagination-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .pagination-controls .btn-page {
+        padding: 8px 14px;
+        border: 2px solid #3498db;
+        background: white;
+        color: #3498db;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 38px;
+    }
+
+    .pagination-controls .btn-page:hover:not(.disabled):not(.active) {
+        background: #3498db;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+    }
+
+    .pagination-controls .btn-page.active {
+        background: #3498db;
+        color: white;
+        cursor: default;
+    }
+
+    .pagination-controls .btn-page.disabled {
+        border-color: #bdc3c7;
+        color: #bdc3c7;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .pagination-controls .page-ellipsis {
+        padding: 8px 10px;
+        color: #546e7a;
+        font-weight: 600;
+    }
+
+    .items-per-page {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .items-per-page label {
+        color: #546e7a;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .items-per-page select {
+    padding: 12px 16px;
+    border: 2px solid #3498db;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c3e50;
+    cursor: pointer;
+    background: white;
+    transition: all 0.3s ease;
+    height: 48px;
+    min-width: 160px;
+}
+
+    .items-per-page select:hover {
+        background: #f8f9fa;
+        box-shadow: 0 2px 6px rgba(52, 152, 219, 0.2);
+    }
+
+    .items-per-page select:focus {
+        outline: none;
+        border-color: #2980b9;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .pagination-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .pagination-controls {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .items-per-page {
+            justify-content: center;
+        }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+    
+    <!-- Filtros -->
+    <div class="filters-container">
+        <form method="get" id="filterForm">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="tipo_reporte">{% trans "Tipo de Reporte" %}:</label>
+                    <select name="tipo_reporte" id="tipo_reporte">
+                        <option value="almacen" {% if filtros.tipo_reporte == 'almacen' %}selected{% endif %}>Movimientos de Almacen</option>
+                        <option value="cliente" {% if filtros.tipo_reporte == 'cliente' %}selected{% endif %}>Movimientos de Cliente</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="fecha_inicio">{% trans "Fecha Inicio" %}:</label>
+                    <input type="date" name="fecha_inicio" id="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="fecha_fin">{% trans "Fecha Fin" %}:</label>
+                    <input type="date" name="fecha_fin" id="fecha_fin" value="{{ filtros.fecha_fin }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="tipo_movimiento">{% trans "Tipo Movimiento" %}:</label>
+                    <select name="tipo_movimiento" id="tipo_movimiento">
+                        <option value="">Todos</option>
+                        {% for valor, nombre in tipos_movimiento %}
+                        <option value="{{ valor }}" {% if filtros.tipo_movimiento == valor %}selected{% endif %}>{{ nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row" id="filtros-almacen" style="{% if filtros.tipo_reporte == 'cliente' %}display:none;{% endif %}">
+                <div class="filter-group">
+                    <label for="almacen">{% trans "Almacen" %}:</label>
+                    <select name="almacen" id="almacen">
+                        <option value="">Todos</option>
+                        {% for almacen in almacenes %}
+                        <option value="{{ almacen.id }}" {% if filtros.almacen|stringformat:"s" == almacen.id|stringformat:"s" %}selected{% endif %}>
+                            {{ almacen.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row" id="filtros-cliente" style="{% if filtros.tipo_reporte == 'almacen' %}display:none;{% endif %}">
+                <div class="filter-group">
+                    <label for="cliente">{% trans "Cliente" %}:</label>
+                    <select name="cliente" id="cliente">
+                        <option value="">Todos</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" {% if filtros.cliente|stringformat:"s" == cliente.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cliente.codigo }} - {{ cliente.nombre }} - {{ cliente.direccion|default:"Sin dirección" }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="numero_movimiento">{% trans "N° Movimiento" %}:</label>
+                    <select name="numero_movimiento" id="numero_movimiento">
+                        <option value="">Todos</option>
+                        {% for numero in numeros_movimientos %}
+                        <option value="{{ numero }}" {% if filtros.numero_movimiento == numero %}selected{% endif %}>
+                            {{ numero }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+            <div class="filter-group">
+                    <label for="proveedor">{% trans "Proveedor" %}:</label>
+                    <select name="proveedor" id="proveedor">
+                        <option value="">Todos</option>
+                        {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}" {% if filtros.proveedor|stringformat:"s" == proveedor.id|stringformat:"s" %}selected{% endif %}>
+                            {{ proveedor.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+            </div>
+    
+            <div class="filter-group">
+                    <label for="recepcionista">{% trans "Recepcionista" %}:</label>
+                    <select name="recepcionista" id="recepcionista">
+                        <option value="">Todos</option>
+                        {% for recepcionista in recepcionistas %}
+                        <option value="{{ recepcionista.id }}" {% if filtros.recepcionista|stringformat:"s" == recepcionista.id|stringformat:"s" %}selected{% endif %}>
+                            {{ recepcionista.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+            </div>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="producto">{% trans "Producto" %}:</label>
+                <select name="producto" id="producto">
+                    <option value="">Todos</option>
+                    {% for producto in productos %}
+                    <option value="{{ producto.id }}" {% if filtros.producto|stringformat:"s" == producto.id|stringformat:"s" %}selected{% endif %}>
+                        {{ producto.codigo }} - {{ producto.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">{% trans "Filtrar" %}</button>
+                <a href="?tipo_reporte={{ filtros.tipo_reporte }}" class="btn btn-info">{% trans "Limpiar Filtros" %}</a>
+                <a href="exportar-excel/?{{ request.GET.urlencode }}" class="btn btn-success">
+                    {% trans "Exportar Excel" %}
+                </a>
+                <a href="exportar-csv/?{{ request.GET.urlencode }}" class="btn btn-success">
+                    {% trans "Exportar CSV" %}
+            </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Estadisticas -->
+    <div class="stats-container">
+        <div class="stat-card" onclick="verDetalleEstadistica('total_movimientos')">
+            <h3>{% trans "Total Movimientos" %}</h3>
+            <div class="number">{{ total_movimientos }}</div>
+        </div>
+        <div class="stat-card" onclick="verDetalleEstadistica('total_productos')">
+            <h3>{% trans "Total Productos" %}</h3>
+            <div class="number">{{ estadisticas.total_productos|default:"0" }}</div>
+        </div>
+        <div class="stat-card" onclick="verDetalleEstadistica('entradas')">
+            <h3>{% trans "Entradas" %}</h3>
+            <div class="number">
+                {% if filtros.tipo_reporte == 'almacen' %}
+                    {{ estadisticas.almacen.entradas|default:"0" }}
+                {% else %}
+                    {{ estadisticas.cliente.entradas|default:"0" }}
+                {% endif %}
+            </div>
+        </div>
+        <div class="stat-card" onclick="verDetalleEstadistica('salidas')">
+            <h3>{% trans "Salidas" %}</h3>
+            <div class="number">
+                {% if filtros.tipo_reporte == 'almacen' %}
+                    {{ estadisticas.almacen.salidas|default:"0" }}
+                {% else %}
+                    {{ estadisticas.cliente.salidas|default:"0" }}
+                {% endif %}
+            </div>
+        </div>
+        <div class="stat-card" onclick="verDetalleEstadistica('traslados')">
+            <h3>{% trans "Traslados" %}</h3>
+            <div class="number">
+                {% if filtros.tipo_reporte == 'almacen' %}
+                    {{ estadisticas.almacen.traslados|default:"0" }}
+                {% else %}
+                    {{ estadisticas.cliente.traslados|default:"0" }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+  
+    <!-- Modal para detalles de estadísticas -->
+    <div id="modal-estadisticas" class="productos-modal" style="display: none;">
+        <div class="modal-overlay" onclick="cerrarModalEstadisticas()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-info">
+                    <h3 id="estadistica-titulo">Detalle de Estadística</h3>
+                </div>
+                <button class="modal-close" onclick="cerrarModalEstadisticas()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="estadistica-contenido">
+                    <!-- Contenido dinámico -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-info" onclick="cerrarModalEstadisticas()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabla de Movimientos -->
+    <div class="table-container">
+    
+        <div class="pagination-controls-top" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <h2 style="margin: 0; border: none; padding: 0;">
+                {% trans "Movimientos" %} 
+                <span style="color: #3498db; font-size: 18px;">
+                    ({{ total_movimientos }} {% trans "encontrados" %})
+                </span>
+            </h2>
+
+            {% if movimientos %}
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div class="items-per-page" style="display: flex; align-items: center; gap: 10px;">
+                    <label for="items-select-mov" style="font-weight: 600; color: #495057;">Mostrar:</label>
+                    <select id="items-select-mov" onchange="changeItemsPerPage(this.value)" 
+                            style="padding: 5px 10px; height: 35px; border: 2px solid #ced4da; border-radius: 4px; font-size: 14px; background: white; cursor: pointer;">
+                        <option value="50" {% if items_por_pagina == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if items_por_pagina == 100 %}selected{% endif %}>100</option>
+                        <option value="200" {% if items_por_pagina == 200 %}selected{% endif %}>200</option>
+                        <option value="500" {% if items_por_pagina == 500 %}selected{% endif %}>500</option>
+                    </select>
+                </div>
+
+                <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+                        style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⏮️ Primera</a>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+                        style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⬅️ Anterior</a>
+                    {% else %}
+                        <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+                        <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+                    {% endif %}
+                    
+                    <span style="padding: 8px 14px; background: #2c3e50; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+                        📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+                    </span>
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+                        style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Siguiente ➡️</a>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+                        style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Última ⏭️</a>
+                    {% else %}
+                        <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+                        <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if movimientos %}
+        <table class="movimientos-table">
+            <thead>
+                <tr>
+                    <th>{% trans "N° Movimiento" %}</th>
+                    <th>{% trans "Tipo" %}</th>
+                    <th>{% trans "Fecha" %}</th>
+                    {% if filtros.tipo_reporte == 'almacen' %}
+                        <th>{% trans "Almacén Origen" %}</th>
+                        <th>{% trans "Almacén Destino" %}</th>
+                    {% else %}
+                        <th>{% trans "Cliente" %}</th>
+                        <th>{% trans "Almacén Origen" %}</th>
+                        <th>{% trans "Almacén Destino" %}</th>
+                        <th>{% trans "Cliente Origen" %}</th>
+                        <th>{% trans "Cliente Destino" %}</th>
+                    {% endif %}
+                    <th>{% trans "Proveedor" %}</th>
+                    <th>{% trans "Recepcionista" %}</th>
+                    <th>{% trans "Productos" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.numero_movimiento }}</td>
+                    <td>
+                        <span class="badge badge-{{ movimiento.tipo|lower }}">
+                            {{ movimiento.get_tipo_display }}
+                        </span>
+                    </td>
+                    <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                    {% if filtros.tipo_reporte == 'almacen' %}
+                        <td>{{ movimiento.almacen_origen|default:"-" }}</td>
+                        <td>{{ movimiento.almacen_destino|default:"-" }}</td>
+                    {% else %}
+                        <td>{{ movimiento.cliente|default:"-" }}</td>
+                        <td>{{ movimiento.almacen_origen|default:"-" }}</td>
+                        <td>{{ movimiento.almacen_destino|default:"-" }}</td>
+                        <td>
+                            {% if movimiento.cliente_origen %}
+                                <span style="color: #e74c3c; font-weight: 600;">{{ movimiento.cliente_origen }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if movimiento.cliente_destino %}
+                                <span style="color: #27ae60; font-weight: 600;">{{ movimiento.cliente_destino }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                    {% endif %}
+                    <td>{{ movimiento.proveedor|default:"-" }}</td>
+                    <td>{{ movimiento.recepcionista|default:"-" }}</td>
+                    <td>
+                        <button class="btn-ver-productos" onclick="verProductos('{{ movimiento.id }}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="9" y1="3" x2="9" y2="21"></line>
+                            </svg>
+                            {{ movimiento.detalles.count }} producto(s)
+                        </button>
+                        <div id="productos-modal-{{ movimiento.id }}" class="productos-modal" style="display: none;">
+                            <div class="modal-overlay" onclick="cerrarModal('{{ movimiento.id }}')"></div>
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <div class="modal-header-info">
+                                        <h3>Productos del Movimiento {{ movimiento.numero_movimiento }}</h3>
+                                        <p class="modal-subtitle">
+                                            <span class="badge badge-{{ movimiento.tipo|lower }}">{{ movimiento.get_tipo_display }}</span>
+                                            <span class="fecha-badge">{{ movimiento.fecha|date:"d/m/Y" }}</span>
+                                        </p>
+                                    </div>
+                                    <button class="modal-close" onclick="cerrarModal('{{ movimiento.id }}')">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="productos-summary">
+                                        <div class="summary-item">
+                                            <span class="summary-label">Total Productos:</span>
+                                            <span class="summary-value">{{ movimiento.detalles.count }}</span>
+                                        </div>
+                                    </div>
+                                    <table class="productos-detalle-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-codigo">Código</th>
+                                                <th class="col-producto">Producto</th>
+                                                <th class="col-cantidad">Cant. Buena</th>
+                                                <th class="col-cantidad">Cant. Dañada</th>
+                                                <th class="col-total">Total</th>
+                                                <th class="col-unidad">Unidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for detalle in movimiento.detalles.all %}
+                                            <tr>
+                                                <td class="col-codigo"><span class="codigo-badge">{{ detalle.producto.codigo }}</span></td>
+                                                <td class="col-producto">{{ detalle.producto.nombre }}</td>
+                                                <td class="col-cantidad cantidad-buena">{{ detalle.cantidad|floatformat:"-2"|default:"0" }}</td>
+                                                <td class="col-cantidad cantidad-danada">{{ detalle.cantidad_danada|floatformat:"-2"|default:"0" }}</td>
+                                                <td class="col-total">
+                                                    <span class="total-badge">{{ detalle.cantidad|add:detalle.cantidad_danada|floatformat:"-2" }}</span>
+                                                </td>
+                                                <td class="col-unidad">{{ detalle.producto.unidad_medida.abreviatura|default:"UND" }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-info" onclick="cerrarModal('{{ movimiento.id }}')">
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="pagination-controls-bottom" style="margin: 20px 0 0 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-top: 3px solid #3498db;">
+            
+            <div class="page-info" style="color: #495057; font-weight: 600; font-size: 14px; background: white; padding: 8px 16px; border-radius: 4px; border: 2px solid #e9ecef;">
+                📊 Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+            </div>
+            
+            <div class="pagination" style="display: flex; gap: 5px; align-items: center;">
+                {% if page_obj.has_previous %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+                    style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⏮️ Primera</a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+                    style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">⬅️ Anterior</a>
+                {% else %}
+                    <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⏮️ Primera</span>
+                    <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">⬅️ Anterior</span>
+                {% endif %}
+                
+                <span style="padding: 8px 14px; background: #2c3e50; color: white; border-radius: 4px; font-weight: 700; font-size: 13px;">
+                    📄 Página {{ page_obj.number }} de {{ paginator.num_pages }}
+                </span>
+                
+                {% if page_obj.has_next %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+                    style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Siguiente ➡️</a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" 
+                    style="padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 600; transition: all 0.3s;">Última ⏭️</a>
+                {% else %}
+                    <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Siguiente ➡️</span>
+                    <span style="padding: 8px 14px; background: #e9ecef; color: #6c757d; border-radius: 4px; font-size: 13px; font-weight: 600;">Última ⏭️</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% else %}
+        <p style="padding: 20px; text-align: center; color: #7f8c8d;">{% trans "No se encontraron movimientos con los filtros seleccionados." %}</p>
+        {% endif %}
+    </div>
+
+    <!-- ✅ GRÁFICO MOVIDO AQUÍ -->
+    <div class="charts-container" style="margin-bottom: 25px; margin-top: 25px;">
+        <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+            📊 Gráfico de Tendencia de Movimientos
+        </h3>
+        <canvas id="movimientoChart"></canvas>
+    </div>
+
+    <!-- Productos mas movidos -->
+    {% if productos_top %}
+    <div class="productos-top">
+        <h2>{% trans "Top 10 Productos Mas Movidos" %}</h2>
+        {% for producto in productos_top %}
+        <div class="producto-item">
+            <span>
+                <strong>{{ producto.codigo }}</strong> - {{ producto.nombre }}
+            </span>
+            <span>
+                {{ producto.total_cantidad }} {{ producto.unidad }} 
+                ({{ producto.total_movimientos }} mov.)
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// ========================================
+// 🎯 FUNCIONES DE MODAL
+// ========================================
+function verProductos(movimientoId) {
+    var modal = document.getElementById('productos-modal-' + movimientoId);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function cerrarModal(movimientoId) {
+    var modal = document.getElementById('productos-modal-' + movimientoId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function cerrarModalEstadisticas() {
+    var modal = document.getElementById('modal-estadisticas');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// ========================================
+// 📊 FUNCIÓN DE ESTADÍSTICAS
+// ========================================
+function verDetalleEstadistica(tipo) {
+    var modal = document.getElementById('modal-estadisticas');
+    var titulo = document.getElementById('estadistica-titulo');
+    var contenido = document.getElementById('estadistica-contenido');
+    
+    var tipoReporte = '{{ filtros.tipo_reporte }}';
+    var movimientos = [
+        {% for mov in movimientos %}
+        {
+            numero: '{{ mov.numero_movimiento }}',
+            tipo: '{{ mov.tipo }}',
+            tipo_display: '{{ mov.get_tipo_display }}',
+            fecha: '{{ mov.fecha|date:"d/m/Y" }}',
+            almacen_origen: '{{ mov.almacen_origen|default:"-" }}',
+            almacen_destino: '{{ mov.almacen_destino|default:"-" }}',
+            {% if filtros.tipo_reporte == 'cliente' %}
+            cliente: '{{ mov.cliente|default:"-" }}',
+            {% endif %}
+            productos: {{ mov.detalles.count }}
+        },
+        {% endfor %}
+    ];
+    
+    var html = '';
+    
+    if (tipo === 'total_movimientos') {
+        titulo.textContent = 'Detalle: Total de Movimientos';
+        html = '<div class="detalle-estadistica-card">';
+        html += '<h4>Resumen General</h4>';
+        html += '<div class="detalle-item"><span class="detalle-label">Total de Movimientos:</span><span class="detalle-value">{{ total_movimientos }}</span></div>';
+        html += '<div class="detalle-item"><span class="detalle-label">Período:</span><span class="detalle-value">';
+        html += '{% if filtros.fecha_inicio %}{{ filtros.fecha_inicio }}{% else %}Inicio{% endif %} - {% if filtros.fecha_fin %}{{ filtros.fecha_fin }}{% else %}Hoy{% endif %}';
+        html += '</span></div></div>';
+        
+        html += '<div class="detalle-estadistica-card"><h4>Últimos Movimientos</h4><div class="detalle-movimientos-list">';
+        movimientos.slice(0, 10).forEach(function(mov) {
+            html += '<div class="movimiento-mini">';
+            html += '<div class="movimiento-mini-info">';
+            html += '<div class="movimiento-mini-numero">' + mov.numero + '</div>';
+            html += '<div class="movimiento-mini-fecha">' + mov.fecha + '</div></div>';
+            html += '<span class="badge badge-' + mov.tipo.toLowerCase() + '">' + mov.tipo_display + '</span></div>';
+        });
+        html += '</div></div>';
+        
+    } else if (tipo === 'total_productos') {
+        titulo.textContent = 'Detalle: Total de Productos';
+        html = '<div class="detalle-estadistica-card"><h4>Información de Productos</h4>';
+        html += '<div class="detalle-item"><span class="detalle-label">Total de Productos Movidos:</span><span class="detalle-value">{{ estadisticas.total_productos|default:"0" }}</span></div>';
+        {% if filtros.tipo_reporte == 'almacen' %}
+        html += '<div class="detalle-item"><span class="detalle-label">Productos Buenos:</span><span class="detalle-value cantidad-buena">{{ estadisticas.almacen.total_productos_buena|default:"0" }}</span></div>';
+        html += '<div class="detalle-item"><span class="detalle-label">Productos Dañados:</span><span class="detalle-value cantidad-danada">{{ estadisticas.almacen.total_productos_danada|default:"0" }}</span></div>';
+        {% else %}
+        html += '<div class="detalle-item"><span class="detalle-label">Productos Buenos:</span><span class="detalle-value cantidad-buena">{{ estadisticas.cliente.total_productos_buena|default:"0" }}</span></div>';
+        html += '<div class="detalle-item"><span class="detalle-label">Productos Dañados:</span><span class="detalle-value cantidad-danada">{{ estadisticas.cliente.total_productos_danada|default:"0" }}</span></div>';
+        {% endif %}
+        html += '</div>';
+        
+    } else if (tipo === 'entradas') {
+        titulo.textContent = 'Detalle: Entradas';
+        var entradas = movimientos.filter(m => m.tipo === 'ENTRADA');
+        html = '<div class="detalle-estadistica-card"><h4>Resumen de Entradas</h4>';
+        html += '<div class="detalle-item"><span class="detalle-label">Total de Entradas:</span><span class="detalle-value">{% if filtros.tipo_reporte == "almacen" %}{{ estadisticas.almacen.entradas|default:"0" }}{% else %}{{ estadisticas.cliente.entradas|default:"0" }}{% endif %}</span></div></div>';
+        
+        html += '<div class="detalle-estadistica-card"><h4>Movimientos de Entrada</h4><div class="detalle-movimientos-list">';
+        entradas.slice(0, 15).forEach(function(mov) {
+            html += '<div class="movimiento-mini"><div class="movimiento-mini-info">';
+            html += '<div class="movimiento-mini-numero">' + mov.numero + '</div>';
+            html += '<div class="movimiento-mini-fecha">' + mov.fecha + ' | ' + mov.productos + ' producto(s)</div></div>';
+            html += '<span class="badge badge-entrada">' + mov.tipo_display + '</span></div>';
+        });
+        if (entradas.length === 0) html += '<p style="text-align: center; color: #546e7a;">No hay entradas en el período seleccionado</p>';
+        html += '</div></div>';
+        
+    } else if (tipo === 'salidas') {
+        titulo.textContent = 'Detalle: Salidas';
+        var salidas = movimientos.filter(m => m.tipo === 'SALIDA');
+        html = '<div class="detalle-estadistica-card"><h4>Resumen de Salidas</h4>';
+        html += '<div class="detalle-item"><span class="detalle-label">Total de Salidas:</span><span class="detalle-value">{% if filtros.tipo_reporte == "almacen" %}{{ estadisticas.almacen.salidas|default:"0" }}{% else %}{{ estadisticas.cliente.salidas|default:"0" }}{% endif %}</span></div></div>';
+        
+        html += '<div class="detalle-estadistica-card"><h4>Movimientos de Salida</h4><div class="detalle-movimientos-list">';
+        salidas.slice(0, 15).forEach(function(mov) {
+            html += '<div class="movimiento-mini"><div class="movimiento-mini-info">';
+            html += '<div class="movimiento-mini-numero">' + mov.numero + '</div>';
+            html += '<div class="movimiento-mini-fecha">' + mov.fecha + ' | ' + mov.productos + ' producto(s)</div></div>';
+            html += '<span class="badge badge-salida">' + mov.tipo_display + '</span></div>';
+        });
+        if (salidas.length === 0) html += '<p style="text-align: center; color: #546e7a;">No hay salidas en el período seleccionado</p>';
+        html += '</div></div>';
+        
+    } else if (tipo === 'traslados') {
+        titulo.textContent = 'Detalle: Traslados';
+        var traslados = movimientos.filter(m => m.tipo === 'TRASLADO');
+        html = '<div class="detalle-estadistica-card"><h4>Resumen de Traslados</h4>';
+        html += '<div class="detalle-item"><span class="detalle-label">Total de Traslados:</span><span class="detalle-value">{% if filtros.tipo_reporte == "almacen" %}{{ estadisticas.almacen.traslados|default:"0" }}{% else %}{{ estadisticas.cliente.traslados|default:"0" }}{% endif %}</span></div></div>';
+        
+        html += '<div class="detalle-estadistica-card"><h4>Movimientos de Traslado</h4><div class="detalle-movimientos-list">';
+        traslados.slice(0, 15).forEach(function(mov) {
+            html += '<div class="movimiento-mini"><div class="movimiento-mini-info">';
+            html += '<div class="movimiento-mini-numero">' + mov.numero + '</div>';
+            html += '<div class="movimiento-mini-fecha">' + mov.fecha + ' | ' + mov.almacen_origen + ' → ' + mov.almacen_destino + '</div></div>';
+            html += '<span class="badge badge-traslado">' + mov.tipo_display + '</span></div>';
+        });
+        if (traslados.length === 0) html += '<p style="text-align: center; color: #546e7a;">No hay traslados en el período seleccionado</p>';
+        html += '</div></div>';
+    }
+    
+    contenido.innerHTML = html;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+// ========================================
+// 🔄 AUTO-SUBMIT AL CAMBIAR TIPO REPORTE
+// ========================================
+document.getElementById('tipo_reporte').addEventListener('change', function() {
+    var tipoReporte = this.value;
+    var filtrosAlmacen = document.getElementById('filtros-almacen');
+    var filtrosCliente = document.getElementById('filtros-cliente');
+    
+    if (tipoReporte === 'almacen') {
+        filtrosAlmacen.style.display = '';
+        filtrosCliente.style.display = 'none';
+    } else {
+        filtrosAlmacen.style.display = 'none';
+        filtrosCliente.style.display = '';
+    }
+    
+    actualizarNumerosMovimiento();
+    document.getElementById('filterForm').submit();
+});
+
+// ========================================
+// 📞 AJAX: ACTUALIZAR NÚMEROS DE MOVIMIENTO
+// ========================================
+function actualizarNumerosMovimiento() {
+    var tipoReporte = document.getElementById('tipo_reporte').value;
+    var fechaInicio = document.getElementById('fecha_inicio').value;
+    var fechaFin = document.getElementById('fecha_fin').value;
+    var tipoMovimiento = document.getElementById('tipo_movimiento').value;
+    var almacen = document.getElementById('almacen').value;
+    var cliente = document.getElementById('cliente').value;
+    var proveedor = document.getElementById('proveedor').value;
+    var recepcionista = document.getElementById('recepcionista').value;
+    
+    var params = new URLSearchParams();
+    params.append('tipo_reporte', tipoReporte);
+    if (fechaInicio) params.append('fecha_inicio', fechaInicio);
+    if (fechaFin) params.append('fecha_fin', fechaFin);
+    if (tipoMovimiento) params.append('tipo_movimiento', tipoMovimiento);
+    if (almacen) params.append('almacen', almacen);
+    if (cliente) params.append('cliente', cliente);
+    if (proveedor) params.append('proveedor', proveedor);
+    if (recepcionista) params.append('recepcionista', recepcionista);
+    
+    var url = 'api/numeros_movimiento/?' + params.toString();
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            var select = document.getElementById('numero_movimiento');
+            var valorActual = select.value;
+            select.innerHTML = '<option value="">Todos</option>';
+            data.numeros.forEach(function(numero) {
+                var option = document.createElement('option');
+                option.value = numero;
+                option.textContent = numero;
+                if (numero === valorActual) option.selected = true;
+                select.appendChild(option);
+            });
+            console.log('✅ Números actualizados: ' + data.numeros.length);
+        })
+        .catch(error => console.error('❌ Error:', error));
+}
+
+// Event listeners para actualización automática
+['tipo_movimiento', 'fecha_inicio', 'fecha_fin', 'almacen', 'cliente', 'proveedor', 'recepcionista'].forEach(id => {
+    document.getElementById(id).addEventListener('change', actualizarNumerosMovimiento);
+});
+
+// ========================================
+// 📄 FUNCIÓN DE PAGINACIÓN (UNIFICADA)
+// ========================================
+function changeItemsPerPage(value) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('items_por_pagina', value);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// ========================================
+// 📊 GRÁFICO DE MOVIMIENTOS
+// ========================================
+let movimientoChartInstance = null;
+
+function actualizarGraficoMovimientos() {
+    const tipoMovimiento = document.getElementById('tipo_movimiento')?.value || '';
+    const fechaInicio = document.getElementById('fecha_inicio')?.value || '';
+    const fechaFin = document.getElementById('fecha_fin')?.value || '';
+    const almacen = document.getElementById('almacen')?.value || '';
+    const cliente = document.getElementById('cliente')?.value || '';
+    const proveedor = document.getElementById('proveedor')?.value || '';
+    const recepcionista = document.getElementById('recepcionista')?.value || '';
+    
+    const url = `obtener-datos-graficos-movimientos/?tipo_movimiento=${tipoMovimiento}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&almacen=${almacen}&cliente=${cliente}&proveedor=${proveedor}&recepcionista=${recepcionista}`;
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            const ctx = document.getElementById('movimientoChart');
+            if (!ctx) return console.error('❌ Canvas no encontrado');
+
+            if (movimientoChartInstance) movimientoChartInstance.destroy();
+
+            movimientoChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#2c3e50', font: { size: 14, weight: 'bold' } } },
+                        title: { display: true, text: 'Tendencia de Movimientos por Mes', color: '#2c3e50', font: { size: 18, weight: 'bold' } },
+                        tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff', borderColor: '#3498db', borderWidth: 1 }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Cantidad Total', color: '#2c3e50', font: { size: 14, weight: 'bold' } }, ticks: { color: '#2c3e50' }, grid: { color: 'rgba(0,0,0,0.1)' } },
+                        x: { title: { display: true, text: 'Período (Año-Mes)', color: '#2c3e50', font: { size: 14, weight: 'bold' } }, ticks: { color: '#2c3e50' }, grid: { color: 'rgba(0,0,0,0.1)' } }
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('❌ Error al cargar gráfico:', error);
+            const container = document.querySelector('.charts-container');
+            if (container) {
+                container.innerHTML = `<div style="padding: 40px; text-align: center; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px;">
+                    <h3 style="color: #856404; margin: 0 0 10px 0;">⚠️ Error al Cargar Gráfico</h3>
+                    <p style="color: #856404; margin: 0;">${error.message}</p>
+                    <button onclick="actualizarGraficoMovimientos()" style="margin-top: 15px; padding: 10px 20px; background: #ffc107; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 Reintentar</button>
+                </div>`;
+            }
+        });
+}
+
+// ========================================
+// 🚀 INICIALIZACIÓN
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof Chart === 'undefined') return console.error('❌ Chart.js no está cargado');
+    
+    const canvas = document.getElementById('movimientoChart');
+    if (!canvas) return console.error('❌ Canvas #movimientoChart no encontrado');
+    
+    actualizarGraficoMovimientos();
+    
+    ['tipo_movimiento', 'fecha_inicio', 'fecha_fin', 'almacen', 'cliente', 'proveedor', 'recepcionista'].forEach(id => {
+        const elemento = document.getElementById(id);
+        if (elemento) elemento.addEventListener('change', actualizarGraficoMovimientos);
+    });
+    
+    // Cerrar modales con ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.productos-modal').forEach(modal => modal.style.display = 'none');
+            document.body.style.overflow = 'auto';
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Efectos hover para botones de paginación
+    const paginationLinks = document.querySelectorAll('.pagination a[href]');
+    paginationLinks.forEach(link => {
+        link.addEventListener('mouseenter', function() {
+            this.style.background = '#5568d3';
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        });
+        link.addEventListener('mouseleave', function() {
+            this.style.background = '#667eea';
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+    });
+});
+
+</script>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script> 
+<style>
+/* Estilos opcionales para el contenedor del gráfico */
+.charts-container {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    height: 500px; /* Altura fija para visualización */
+}
+</style>
+{% endblock %}
+
