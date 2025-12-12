@@ -1424,20 +1424,7 @@ class ReporteStockAdmin(admin.ModelAdmin):
                 items_por_pagina = 100
         except (ValueError, TypeError):
             items_por_pagina = 100
-
-        # 3. Obtener listados filtrados
-        almacenes = Almacen.objects.filter(activo=True)
-        if almacen_id:
-            almacenes = almacenes.filter(id=almacen_id)
-
-        productos_qs = Producto.objects.filter(activo=True).order_by('codigo')
-        if categoria_id:
-            productos_qs = productos_qs.filter(categoria_id=categoria_id)
-        if producto_id:
-            productos_qs = productos_qs.filter(id=producto_id)
-            
-        productos_info = {p.id: p for p in productos_qs}
-
+      
 # =========================================================
         # ✅ OPTIMIZACIÓN CLAVE: Calcular Stock Masivo (1 consulta por almacén)
         # =========================================================
