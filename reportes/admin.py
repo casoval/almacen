@@ -43,124 +43,169 @@ class ReporteMovimientoAdmin(admin.ModelAdmin):
         return True
     
     def changelist_view(self, request, extra_context=None):
+        """Vista personalizada con filtros y PAGINACIÓN"""
         extra_context = extra_context or {}
         
-        # 1. Filtros
-        vista = request.GET.get('vista', 'detallado')
+        # 1. Obtener parámetros de filtro
+        tipo_reporte = request.GET.get('tipo_reporte', 'almacen')
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
+        tipo_movimiento = request.GET.get('tipo_movimiento', '')
+        almacen_id = request.GET.get('almacen', '')
         cliente_id = request.GET.get('cliente', '')
-        categoria_id = request.GET.get('categoria', '')
+        proveedor_id = request.GET.get('proveedor', '')
+        recepcionista_id = request.GET.get('recepcionista', '')
         producto_id = request.GET.get('producto', '')
+        numero_movimiento = request.GET.get('numero_movimiento', '').strip()
         
-        # Paginación
-        page = request.GET.get('page', 1)
-        items_por_pagina = int(request.GET.get('items_por_pagina', '100'))
+        # 2. Convertir fechas
+        fecha_inicio_obj = None
+        fecha_fin_obj = None
         
-        # Conversión de fechas
-        fecha_inicio_obj = datetime.strptime(fecha_inicio, '%Y-%m-%d').date() if fecha_inicio else None
-        fecha_fin_obj = datetime.strptime(fecha_fin, '%Y-%m-%d').date() if fecha_fin else None
+        if fecha_inicio:
+            try:
+                fecha_inicio_obj = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+            except ValueError:
+                pass
         
-        cliente_id_int = int(cliente_id) if cliente_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
-
-        entregas = []
-        estadisticas = {}
-        productos_top = [] # Se pueden calcular aparte si es necesario
-        resumen_clientes = []
-
-        # =================================================
-        # 🚀 LLAMADA A LA LÓGICA OPTIMIZADA
-        # =================================================
-        if vista == 'detallado':
-            # Obtenemos la lista procesada (mucho más pequeña que los movimientos crudos)
-            data_procesada = ReporteEntregas.obtener_entregas_optimizadas(
+        if fecha_fin:
+            try:
+                fecha_fin_obj = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        # 3. Obtener QuerySet de movimientos (Filtrado)
+        if tipo_reporte == 'almacen':
+            movimientos = ReporteMovimiento.obtener_movimientos_almacen(
                 fecha_inicio=fecha_inicio_obj,
                 fecha_fin=fecha_fin_obj,
-                cliente_id=cliente_id_int,
-                categoria_id=categoria_id_int,
-                producto_id=producto_id_int
+                almacen=almacen_id if almacen_id else None,
+                tipo=tipo_movimiento if tipo_movimiento else None,
+                proveedor=proveedor_id if proveedor_id else None,
+                recepcionista=recepcionista_id if recepcionista_id else None
             )
-            
-            # Ordenar en Python (rápido porque la lista ya está resumida)
-            # Ordenamos por Cliente -> Producto
-            entregas = sorted(data_procesada, key=lambda x: (x['cliente'].nombre, x['producto'].nombre))
-            
-            # Calcular estadísticas sobre la lista resumida
-            cantidad_total_global = sum(item['stock_total'] for item in entregas)
-            clientes_unicos = set(item['cliente'].id for item in entregas)
-            productos_unicos = set(item['producto'].id for item in entregas)
-            
-            estadisticas = {
-                'cantidad_total': cantidad_total_global,
-                'total_clientes_unicos': len(clientes_unicos),
-                'total_productos_unicos': len(productos_unicos),
-            }
-
-        elif vista == 'por_cliente':
-             # Reutilizamos la lógica optimizada pero agrupamos un nivel más
-            data_procesada = ReporteEntregas.obtener_entregas_optimizadas(
-                fecha_inicio=fecha_inicio_obj, fecha_fin=fecha_fin_obj, 
-                cliente_id=cliente_id_int, categoria_id=categoria_id_int, producto_id=producto_id_int
-            )
-            
-            temp_cli = {}
-            for item in data_procesada:
-                cid = item['cliente'].id
-                if cid not in temp_cli:
-                    temp_cli[cid] = {
-                        'cliente_id': cid,
-                        'cliente_nombre': item['cliente'].nombre,
-                        'cliente_codigo': item['cliente'].codigo,
-                        'cliente_direccion': item['cliente'].direccion,
-                        'cliente_telefono': item['cliente'].telefono,
-                        'total_entregas': 0, # Esto es aproximado en vista agrupada
-                        'total_productos': 0,
-                        'cantidad_total': 0
-                    }
-                temp_cli[cid]['total_productos'] += 1
-                # Nota: total_entregas es difícil de sumar exacto sin sets, pero es una aprox válida
-                temp_cli[cid]['total_entregas'] += item['total_entregas'] 
-                temp_cli[cid]['cantidad_total'] += item['stock_total']
-            
-            entregas = list(temp_cli.values())
-            entregas.sort(key=lambda x: x['cliente_nombre'])
-
-        # =================================================
-        # PAGINACIÓN (Ahora sí es segura porque 'entregas' es una lista resumida)
-        # =================================================
-        # Si tienes 10,000 movimientos, 'entregas' tendrá quizás 500 filas (Combinaciones Cliente-Producto)
-        # Esto es manejable en memoria.
+            if producto_id:
+                movimientos = movimientos.filter(detalles__producto_id=producto_id).distinct()
+            if numero_movimiento:
+                movimientos = movimientos.filter(numero_movimiento__icontains=numero_movimiento)
         
-        paginator = Paginator(entregas, items_por_pagina)
-        try:
-            entregas_paginadas = paginator.page(page)
-        except PageNotAnInteger:
-            entregas_paginadas = paginator.page(1)
-        except EmptyPage:
-            entregas_paginadas = paginator.page(paginator.num_pages)
+        else:
+            movimientos = ReporteMovimiento.obtener_movimientos_cliente(
+                fecha_inicio=fecha_inicio_obj,
+                fecha_fin=fecha_fin_obj,
+                cliente=cliente_id if cliente_id else None,
+                tipo=tipo_movimiento if tipo_movimiento else None,
+                proveedor=proveedor_id if proveedor_id else None,
+                recepcionista=recepcionista_id if recepcionista_id else None
+            )
+            if producto_id:
+                movimientos = movimientos.filter(detalles__producto_id=producto_id).distinct()
+            if numero_movimiento:
+                movimientos = movimientos.filter(numero_movimiento__icontains=numero_movimiento)
 
+        # 4. Obtener listado de números de movimientos para el filtro (Dropdown)
+        # Nota: Esto se podría optimizar, pero mantenemos tu lógica original
+        if tipo_reporte == 'almacen':
+            movimientos_query = MovimientoAlmacen.objects.all()
+            # ... (Tus filtros para el dropdown) ...
+            if fecha_inicio_obj: movimientos_query = movimientos_query.filter(fecha__gte=fecha_inicio_obj)
+            if fecha_fin_obj: movimientos_query = movimientos_query.filter(fecha__lte=fecha_fin_obj)
+            if almacen_id: movimientos_query = movimientos_query.filter(Q(almacen_origen_id=almacen_id) | Q(almacen_destino_id=almacen_id))
+            if tipo_movimiento: movimientos_query = movimientos_query.filter(tipo=tipo_movimiento)
+            if proveedor_id: movimientos_query = movimientos_query.filter(proveedor_id=proveedor_id)
+            if recepcionista_id: movimientos_query = movimientos_query.filter(recepcionista_id=recepcionista_id)
+            numeros_movimientos = movimientos_query.values_list('numero_movimiento', flat=True).distinct().order_by('-numero_movimiento')
+        else:
+            movimientos_query = MovimientoCliente.objects.all()
+            # ... (Tus filtros para el dropdown) ...
+            if fecha_inicio_obj: movimientos_query = movimientos_query.filter(fecha__gte=fecha_inicio_obj)
+            if fecha_fin_obj: movimientos_query = movimientos_query.filter(fecha__lte=fecha_fin_obj)
+            if cliente_id: movimientos_query = movimientos_query.filter(cliente_id=cliente_id)
+            if tipo_movimiento: movimientos_query = movimientos_query.filter(tipo=tipo_movimiento)
+            if proveedor_id: movimientos_query = movimientos_query.filter(proveedor_id=proveedor_id)
+            if recepcionista_id: movimientos_query = movimientos_query.filter(recepcionista_id=recepcionista_id)
+            numeros_movimientos = movimientos_query.values_list('numero_movimiento', flat=True).distinct().order_by('-numero_movimiento')
+        
+        # =========================================================
+        # ⚠️ CORRECCIÓN IMPORTANTE: Calcular Estadísticas Faltantes
+        # =========================================================
+        estadisticas = ReporteMovimiento.estadisticas_generales(
+            fecha_inicio=fecha_inicio_obj,
+            fecha_fin=fecha_fin_obj
+        )
+        
+        productos_top = ReporteMovimiento.productos_mas_movidos(
+            fecha_inicio=fecha_inicio_obj,
+            fecha_fin=fecha_fin_obj,
+            limite=10
+        )
+
+        # ==========================================
+        # ✅ PAGINACIÓN
+        # ==========================================
+        page = request.GET.get('page', 1)
+        items_por_pagina = request.GET.get('items_por_pagina', '100')
+        
+        try:
+            items_por_pagina = int(items_por_pagina)
+            if items_por_pagina not in [50, 100, 200, 500]:
+                items_por_pagina = 100
+        except (ValueError, TypeError):
+            items_por_pagina = 100
+
+        # Calcular total ANTES de paginar
+        total_movimientos = movimientos.count()
+        
+        paginator = Paginator(movimientos, items_por_pagina)
+        
+        try:
+            movimientos_paginados = paginator.page(page)
+        except PageNotAnInteger:
+            movimientos_paginados = paginator.page(1)
+        except EmptyPage:
+            movimientos_paginados = paginator.page(paginator.num_pages)       
+        
         context = {
             **self.admin_site.each_context(request),
-            'title': _('Reportes de Entregas (Optimizado)'),
-            'entregas': entregas_paginadas,
-            'estadisticas': estadisticas,
-            'productos_top': [], # Puedes reactivarlo si haces una query dedicada pequeña
-            'resumen_clientes': [], 
-            'clientes': Cliente.objects.filter(activo=True).order_by('nombre'),
-            'categorias': Categoria.objects.all(),
+            'title': _('Reportes de Movimientos: ALMACENES Y CLIENTES'),
+            'movimientos': movimientos_paginados,  # ✅ Paginado
+            'total_movimientos': total_movimientos, # ✅ Total real
+            'estadisticas': estadisticas,          # ✅ Ahora sí existe
+            'productos_top': productos_top,        # ✅ Ahora sí existe
+            'almacenes': Almacen.objects.filter(activo=True),
+            'clientes': Cliente.objects.filter(activo=True),
+            'proveedores': Proveedor.objects.filter(activo=True),
+            'recepcionistas': Recepcionista.objects.filter(activo=True),
             'productos': Producto.objects.filter(activo=True).order_by('codigo'),
+            'numeros_movimientos': list(numeros_movimientos[:200]),
+            'tipos_movimiento': [
+                ('ENTRADA', 'Entrada'),
+                ('SALIDA', 'Salida'),
+                ('TRASLADO', 'Traslado')
+            ],
             'filtros': {
-                'vista': vista, 'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin,
-                'cliente': cliente_id, 'categoria': categoria_id, 'producto': producto_id,
+                'tipo_reporte': tipo_reporte,
+                'fecha_inicio': fecha_inicio,
+                'fecha_fin': fecha_fin,
+                'tipo_movimiento': tipo_movimiento,
+                'almacen': almacen_id,
+                'cliente': cliente_id,
+                'proveedor': proveedor_id,
+                'recepcionista': recepcionista_id,
+                'producto': producto_id,
+                'numero_movimiento': numero_movimiento,
             },
-            'page_obj': entregas_paginadas,
+            # ✅ VARIABLES DE PAGINACIÓN
+            'page_obj': movimientos_paginados,
             'paginator': paginator,
             'items_por_pagina': items_por_pagina,
             'opciones_items': [50, 100, 200, 500],
             'opts': self.model._meta,
         }
+        
+        if extra_context:
+            context.update(extra_context)
+        
         return render(request, self.change_list_template, context)
 
     def get_urls(self):
@@ -907,6 +952,44 @@ class ReporteEntregasAdmin(admin.ModelAdmin):
         
         return render(request, self.change_list_template, context)
     
+        # ✅ AGREGAR: Parámetros de paginación
+        # 1. Definir variables de paginación (si no lo hiciste en el paso anterior)
+        page = request.GET.get('page', 1)
+        items_por_pagina = request.GET.get('items_por_pagina', '100')
+        
+        try:
+            items_por_pagina = int(items_por_pagina)
+            if items_por_pagina not in [50, 100, 200, 500]:
+                items_por_pagina = 100
+        except (ValueError, TypeError):
+            items_por_pagina = 100
+
+        # 2. Calcular total ANTES de paginar
+        total_entregas = len(entregas)
+        
+        # 3. Aplicar Paginación (USANDO LA IMPORTACIÓN GLOBAL, NO LA LOCAL)
+        # Nota: NO agregues 'from django.core.paginator...' aquí.
+        
+        paginator = Paginator(entregas, items_por_pagina)
+        
+        try:
+            entregas_paginadas = paginator.page(page)
+        except PageNotAnInteger:
+            entregas_paginadas = paginator.page(1)
+        except EmptyPage:
+            entregas_paginadas = paginator.page(paginator.num_pages)
+        
+        context = {
+            # ... contexto existente ...
+            'entregas': entregas_paginadas,  # ✅ Usar lista paginada
+            'total_entregas': total_entregas,  # ✅ Total sin paginar
+            
+            # ✅ AGREGAR: Variables de paginación
+            'page_obj': entregas_paginadas,
+            'paginator': paginator,
+            'items_por_pagina': items_por_pagina,
+            'opciones_items': [50, 100, 200, 500],
+        }
     
     def get_urls(self):
         urls = super().get_urls()
@@ -1566,296 +1649,324 @@ class ReporteStockAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    def changelist_view(self, request, extra_context=None):
-        extra_context = extra_context or {}
-        
-        # Filtros
+    
+    def exportar_excel(self, request):
+        """Exporta el reporte de stock a Excel con todos los datos visibles en la lista"""
+
+        # ==============================
+        # 1. OBTENER FILTROS
+        # ==============================
         vista = request.GET.get('vista', 'detallado')
         almacen_id = request.GET.get('almacen', '')
         categoria_id = request.GET.get('categoria', '')
         producto_id = request.GET.get('producto', '')
-        stock_minimo = request.GET.get('stock_minimo', '') == 'on' # Checkbox devuelve 'on'
-        solo_con_stock = request.GET.get('solo_con_stock', '') == 'on'
-        
-        # Paginación
-        page = request.GET.get('page', 1)
-        items_por_pagina = int(request.GET.get('items_por_pagina', '100'))
+        stock_minimo = request.GET.get('stock_minimo', '')
+        solo_con_stock = request.GET.get('solo_con_stock', '')
 
-        # ========================================================
-        # 🚀 OPTIMIZACIÓN: LLAMADA UNICA MASIVA
-        # ========================================================
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
+        almacenes = Almacen.objects.filter(activo=True)
+        productos = Producto.objects.filter(activo=True)
 
-        # Obtenemos TODOS los datos ya calculados en una lista de diccionarios
-        dataset_completo = ReporteStock.obtener_data_stock_masivo(
-            almacen_id=almacen_id_int,
-            categoria_id=categoria_id_int,
-            producto_id=producto_id_int,
-            stock_minimo=stock_minimo,
-            solo_con_stock=solo_con_stock
+        # Filtros
+        if almacen_id:
+            almacenes = almacenes.filter(id=almacen_id)
+        if categoria_id:
+            productos = productos.filter(categoria_id=categoria_id)
+        if producto_id:
+            productos = productos.filter(id=producto_id)
+
+        import decimal
+        stocks = []
+
+        # ==============================
+        # 2. GENERAR DATOS SEGÚN VISTA
+        # ==============================
+
+        # ---------- VISTA DETALLADA ----------
+        if vista == "detallado":
+            for almacen in almacenes:
+                for producto in productos:
+                    stock_data = almacen.get_stock_producto(producto)
+
+                    if solo_con_stock and stock_data["stock_total"] == 0:
+                        continue
+
+                    if stock_minimo and stock_data["stock_bueno"] > producto.stock_minimo:
+                        continue
+
+                    stocks.append({
+                        "almacen": almacen.nombre,
+                        "producto_codigo": producto.codigo,
+                        "producto_nombre": producto.nombre,
+                        "categoria": producto.categoria.nombre if producto.categoria else "-",
+                        "unidad": producto.unidad_medida.abreviatura if producto.unidad_medida else "-",
+                        "entrada": stock_data['entradas_total'],
+                        "salida": stock_data['salidas_total'],
+                        "traslados": stock_data['traslados_netos_total'],
+                        "stock_bueno": stock_data['stock_bueno'],
+                        "stock_danado": stock_data['stock_danado'],
+                        "stock_total": stock_data['stock_total'],
+                    })
+
+        # ---------- VISTA POR ALMACÉN ----------
+        elif vista == "por_almacen":
+            for almacen in almacenes:
+                stock_alm = almacen.get_todos_los_stocks()
+
+                stocks.append({
+                    "almacen": almacen.nombre,
+                    "total_productos": len(stock_alm),
+                    "stock_bueno_total": sum(s['stock_bueno'] for s in stock_alm.values()),
+                    "stock_danado_total": sum(s['stock_danado'] for s in stock_alm.values()),
+                    "stock_total": sum(s['stock_total'] for s in stock_alm.values()),
+                })
+
+        # ---------- VISTA POR PRODUCTO ----------
+        else:
+            for producto in productos:
+                total_bueno = 0
+                total_danado = 0
+                total_almacenes = 0
+
+                for almacen in Almacen.objects.filter(activo=True):
+                    stock_data = almacen.get_stock_producto(producto)
+                    if stock_data['stock_total'] != 0:
+                        total_bueno += stock_data['stock_bueno']
+                        total_danado += stock_data['stock_danado']
+                        total_almacenes += 1
+
+                stocks.append({
+                    "producto_codigo": producto.codigo,
+                    "producto_nombre": producto.nombre,
+                    "categoria": producto.categoria.nombre if producto.categoria else "-",
+                    "unidad": producto.unidad_medida.abreviatura if producto.unidad_medida else "-",
+                    "total_almacenes": total_almacenes,
+                    "stock_bueno_total": total_bueno,
+                    "stock_danado_total": total_danado,
+                    "stock_total": total_bueno + total_danado,
+                })
+
+        # ==============================
+        # 3. CREAR EXCEL
+        # ==============================
+        from django.http import HttpResponse
+        from datetime import datetime
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        
-        # Procesamiento de Vistas (Agrupación en Python, no en DB)
-        stocks_display = []
-        estadisticas = {
-            'stock_bueno_total': Decimal(0),
-            'stock_danado_total': Decimal(0),
-            'productos_bajo_minimo': 0,
-            'total_almacenes': 0 # Se calcula abajo
-        }
+        filename = f"reporte_stock_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-        # Calcular totales globales rápidos recorriendo la lista una vez
-        almacenes_unicos = set()
-        
-        for item in dataset_completo:
-            estadisticas['stock_bueno_total'] += item['stock_bueno']
-            estadisticas['stock_danado_total'] += item['stock_danado']
-            almacenes_unicos.add(item['almacen'].id)
-            
-            p = item['producto']
-            if p.stock_minimo and item['stock_bueno'] <= p.stock_minimo:
-                estadisticas['productos_bajo_minimo'] += 1
-
-        estadisticas['total_almacenes'] = len(almacenes_unicos)
-        estadisticas['total_productos'] = len(dataset_completo) # Aprox
-
-        if vista == 'detallado':
-            stocks_display = dataset_completo # Ya viene en el formato correcto
-            
-        elif vista == 'por_almacen':
-            # Agrupar en memoria
-            temp_alm = {}
-            for item in dataset_completo:
-                aid = item['almacen'].id
-                if aid not in temp_alm:
-                    temp_alm[aid] = {
-                        'almacen': item['almacen'],
-                        'total_productos': 0,
-                        'stock_buena_total': 0,
-                        'stock_danada_total': 0,
-                        'stock_total': 0
-                    }
-                temp_alm[aid]['total_productos'] += 1
-                temp_alm[aid]['stock_buena_total'] += item['stock_bueno']
-                temp_alm[aid]['stock_danada_total'] += item['stock_danado']
-                temp_alm[aid]['stock_total'] += item['stock_total']
-            stocks_display = list(temp_alm.values())
-            
-        else: # por_producto
-            # Agrupar en memoria
-            temp_prod = {}
-            for item in dataset_completo:
-                pid = item['producto'].id
-                if pid not in temp_prod:
-                    temp_prod[pid] = {
-                        'producto': item['producto'],
-                        'total_almacenes': 0,
-                        'stock_buena_total': 0,
-                        'stock_danada_total': 0,
-                        'stock_total': 0
-                    }
-                temp_prod[pid]['total_almacenes'] += 1
-                temp_prod[pid]['stock_buena_total'] += item['stock_bueno']
-                temp_prod[pid]['stock_danada_total'] += item['stock_danado']
-                temp_prod[pid]['stock_total'] += item['stock_total']
-            stocks_display = list(temp_prod.values())
-
-        # Paginación
-        paginator = Paginator(stocks_display, items_por_pagina)
-        try:
-            stocks_paginados = paginator.page(page)
-        except:
-            stocks_paginados = paginator.page(1)
-
-        # Contexto (El resto se mantiene igual)
-        context = {
-            **self.admin_site.each_context(request),
-            'title': _('Reporte Stock Almacén (Optimizado)'),
-            'stocks': stocks_paginados,
-            'estadisticas': estadisticas,
-            'almacenes': Almacen.objects.filter(activo=True),
-            'categorias': Categoria.objects.all(),
-            'productos': Producto.objects.filter(activo=True).order_by('codigo'),
-            'filtros': {
-                'vista': vista, 'almacen': almacen_id, 'categoria': categoria_id,
-                'producto': producto_id, 'stock_minimo': request.GET.get('stock_minimo'),
-                'solo_con_stock': request.GET.get('solo_con_stock')
-            },
-            'page_obj': stocks_paginados, 'paginator': paginator,
-            'items_por_pagina': items_por_pagina,
-            'opts': self.model._meta,
-        }
-        return render(request, self.change_list_template, context)
-
-
-    def exportar_excel(self, request):
-        """
-        Exporta el reporte de stock a un archivo Excel (.xlsx) usando la data masiva optimizada.
-        """
-        # 1. Recuperar filtros (misma lógica que en changelist_view)
-        almacen_id = request.GET.get('almacen', '')
-        categoria_id = request.GET.get('categoria', '')
-        producto_id = request.GET.get('producto', '')
-        stock_minimo = request.GET.get('stock_minimo', '') == 'on'
-        solo_con_stock = request.GET.get('solo_con_stock', '') == 'on'
-        
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
-
-        # 2. 🚀 LLAMADA OPTIMIZADA: Obtener TODOS los datos en una lista de diccionarios
-        try:
-            from .models import ReporteStock
-            dataset_completo = ReporteStock.obtener_data_stock_masivo(
-                almacen_id=almacen_id_int,
-                categoria_id=categoria_id_int,
-                producto_id=producto_id_int,
-                stock_minimo=stock_minimo,
-                solo_con_stock=solo_con_stock
-            )
-        except Exception as e:
-            # Manejar errores de consulta si es necesario
-            return HttpResponse(f"Error al obtener datos: {e}", status=500)
-
-        # 3. Preparar el archivo Excel
         wb = Workbook()
         ws = wb.active
-        ws.title = "ReporteStock"
-        
-        # Estilos
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="337AB7", end_color="337AB7", fill_type="solid")
-        center_alignment = Alignment(horizontal="center", vertical="center")
-        right_alignment = Alignment(horizontal="right", vertical="center")
+        ws.title = "Reporte Stock"
 
-        # Encabezados
-        headers = [
-            _("Almacén"), _("Código Producto"), _("Nombre Producto"), _("Categoría"), 
-            _("U/M"), _("Stock Mínimo"), _("Entradas Totales"), _("Salidas Totales"), 
-            _("Stock Bueno"), _("Stock Dañado"), _("Stock Total")
-        ]
+        # ==============================
+        # 4. ENCABEZADOS DINÁMICOS
+        # ==============================
+
+        if vista == "detallado":
+            headers = [
+                "Almacén", "Código", "Producto", "Categoría", "Unidad",
+                "Entradas", "Salidas", "Traslados",
+                "Stock Bueno", "Stock Dañado", "Stock Total"
+            ]
+        elif vista == "por_almacen":
+            headers = [
+                "Almacén", "Total Productos", 
+                "Stock Bueno Total", "Stock Dañado Total", "Stock Total"
+            ]
+        else:
+            headers = [
+                "Código", "Producto", "Categoría", "Unidad",
+                "Almacenes con Stock", "Stock Bueno Total",
+                "Stock Dañado Total", "Stock Total"
+            ]
+
         ws.append(headers)
 
-        # Aplicar estilos a la cabecera
-        for col_num, header in enumerate(headers, 1):
-            col_letter = get_column_letter(col_num)
-            cell = ws[f'{col_letter}1']
-            cell.font = header_font
+        # Estilo encabezados
+        header_fill = PatternFill(start_color="1E88E5", end_color="1E88E5", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        border = Border(
+            left=Side(border_style="thin", color="000000"),
+            right=Side(border_style="thin", color="000000"),
+            top=Side(border_style="thin", color="000000"),
+            bottom=Side(border_style="thin", color="000000"),
+        )
+
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col)
             cell.fill = header_fill
-            cell.alignment = center_alignment
+            cell.font = header_font
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center")
 
-        # Ajustar anchos y formato de números
-        ws.column_dimensions['A'].width = 25
-        ws.column_dimensions['B'].width = 15
-        ws.column_dimensions['C'].width = 40
-        ws.column_dimensions['D'].width = 20
-        ws.column_dimensions['K'].width = 15 # Stock Total
+        # ==============================
+        # 5. AGREGAR DATOS
+        # ==============================
+        for item in stocks:
+            ws.append(list(item.values()))
 
-        # 4. Iterar sobre la lista optimizada y escribir filas
-        for row_num, data in enumerate(dataset_completo, 2):
-            producto = data['producto']
-            almacen = data['almacen']
-            
-            row = [
-                almacen.nombre,
-                producto.codigo,
-                producto.nombre,
-                producto.categoria.nombre if producto.categoria else '',
-                producto.unidad_medida.nombre if producto.unidad_medida else '',
-                producto.stock_minimo,
-                data['entradas_total'],
-                data['salidas_total'],
-                data['stock_bueno'],
-                data['stock_danado'],
-                data['stock_total']
-            ]
-            ws.append(row)
-            
-            # Aplicar formato de números (columnas G a K) y alineación
-            for col_idx in range(7, 12): 
-                col_letter = get_column_letter(col_idx)
-                cell = ws[f'{col_letter}{row_num}']
-                cell.number_format = '#,##0.00'
-                cell.alignment = right_alignment
-                
-            # Resaltar si está bajo stock mínimo
-            if producto.stock_minimo and data['stock_bueno'] <= producto.stock_minimo:
-                 for col_idx in range(1, 12):
-                    col_letter = get_column_letter(col_idx)
-                    ws[f'{col_letter}{row_num}'].fill = PatternFill(start_color="F5C3C2", end_color="F5C3C2", fill_type="solid") # Rojo claro
+        # ==============================
+        # 6. AJUSTAR ANCHO COLUMNAS
+        # ==============================
+        for col in ws.columns:
+            max_length = max(len(str(cell.value)) for cell in col)
+            ws.column_dimensions[get_column_letter(col[0].column)].width = max_length + 2
 
-        # 5. Configurar la respuesta HTTP
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="ReporteStock_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        # Guardar el libro de trabajo en la respuesta
+        # ==============================
+        # 7. FILTRO AUTOMÁTICO
+        # ==============================
+        ws.auto_filter.ref = ws.dimensions
+
+        # ==============================
+        # 8. GUARDAR
+        # ==============================
         wb.save(response)
         return response
 
     def exportar_csv(self, request):
-        """
-        Exporta el reporte de stock a un archivo CSV.
-        """
-        # 1. Recuperar filtros (misma lógica que en changelist_view)
+        """Exporta el reporte de stock a CSV con los mismos filtros que Excel."""
+
+        import csv
+        from django.http import HttpResponse
+        from datetime import datetime
+        from decimal import Decimal
+
+        # ==============================
+        # 1. OBTENER FILTROS
+        # ==============================
+        vista = request.GET.get('vista', 'detallado')
         almacen_id = request.GET.get('almacen', '')
         categoria_id = request.GET.get('categoria', '')
         producto_id = request.GET.get('producto', '')
-        stock_minimo = request.GET.get('stock_minimo', '') == 'on'
-        solo_con_stock = request.GET.get('solo_con_stock', '') == 'on'
-        
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
+        stock_minimo = request.GET.get('stock_minimo', '')
+        solo_con_stock = request.GET.get('solo_con_stock', '')
 
-        # 2. 🚀 LLAMADA OPTIMIZADA: Obtener TODOS los datos en una lista de diccionarios
-        try:
-            from .models import ReporteStock
-            dataset_completo = ReporteStock.obtener_data_stock_masivo(
-                almacen_id=almacen_id_int,
-                categoria_id=categoria_id_int,
-                producto_id=producto_id_int,
-                stock_minimo=stock_minimo,
-                solo_con_stock=solo_con_stock
-            )
-        except Exception as e:
-            return HttpResponse(f"Error al obtener datos: {e}", status=500)
-        
-        # 3. Preparar la respuesta HTTP para CSV
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="ReporteStock_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-        response.write(u'\ufeff'.encode('utf8')) # Escribir BOM para compatibilidad con Excel (UTF-8)
-        
-        writer = csv.writer(response)
+        almacenes = Almacen.objects.filter(activo=True)
+        productos = Producto.objects.filter(activo=True)
 
-        # 4. Escribir la cabecera
-        headers = [
-            _("Almacén"), _("Código Producto"), _("Nombre Producto"), _("Categoría"), 
-            _("U/M"), _("Stock Mínimo"), _("Entradas Totales"), _("Salidas Totales"), 
-            _("Stock Bueno"), _("Stock Dañado"), _("Stock Total")
-        ]
+        # Filtros
+        if almacen_id:
+            almacenes = almacenes.filter(id=almacen_id)
+        if categoria_id:
+            productos = productos.filter(categoria_id=categoria_id)
+        if producto_id:
+            productos = productos.filter(id=producto_id)
+
+        stocks = []
+
+        # ==============================
+        # 2. GENERAR DATOS SEGÚN VISTA
+        # ==============================
+
+        # ---------- VISTA DETALLADA ----------
+        if vista == "detallado":
+            for almacen in almacenes:
+                for producto in productos:
+                    stock_data = almacen.get_stock_producto(producto)
+
+                    if solo_con_stock and stock_data["stock_total"] == 0:
+                        continue
+
+                    if stock_minimo and stock_data["stock_bueno"] > producto.stock_minimo:
+                        continue
+
+                    stocks.append({
+                        "almacen": almacen.nombre,
+                        "producto_codigo": producto.codigo,
+                        "producto_nombre": producto.nombre,
+                        "categoria": producto.categoria.nombre if producto.categoria else "-",
+                        "unidad": producto.unidad_medida.abreviatura if producto.unidad_medida else "-",
+                        "entrada": stock_data['entradas_total'],
+                        "salida": stock_data['salidas_total'],
+                        "traslados": stock_data['traslados_netos_total'],
+                        "stock_bueno": stock_data['stock_bueno'],
+                        "stock_danado": stock_data['stock_danado'],
+                        "stock_total": stock_data['stock_total'],
+                    })
+
+        # ---------- VISTA POR ALMACÉN ----------
+        elif vista == "por_almacen":
+            for almacen in almacenes:
+                stock_alm = almacen.get_todos_los_stocks()
+
+                stocks.append({
+                    "almacen": almacen.nombre,
+                    "total_productos": len(stock_alm),
+                    "stock_bueno_total": sum(s['stock_bueno'] for s in stock_alm.values()),
+                    "stock_danado_total": sum(s['stock_danado'] for s in stock_alm.values()),
+                    "stock_total": sum(s['stock_total'] for s in stock_alm.values()),
+                })
+
+        # ---------- VISTA POR PRODUCTO ----------
+        else:
+            for producto in productos:
+                total_bueno = 0
+                total_danado = 0
+                total_almacenes = 0
+
+                for almacen in Almacen.objects.filter(activo=True):
+                    stock_data = almacen.get_stock_producto(producto)
+                    if stock_data['stock_total'] != 0:
+                        total_bueno += stock_data['stock_bueno']
+                        total_danado += stock_data['stock_danado']
+                        total_almacenes += 1
+
+                stocks.append({
+                    "producto_codigo": producto.codigo,
+                    "producto_nombre": producto.nombre,
+                    "categoria": producto.categoria.nombre if producto.categoria else "-",
+                    "unidad": producto.unidad_medida.abreviatura if producto.unidad_medida else "-",
+                    "total_almacenes": total_almacenes,
+                    "stock_bueno_total": total_bueno,
+                    "stock_danado_total": total_danado,
+                    "stock_total": total_bueno + total_danado,
+                })
+
+        # ==============================
+        # 3. PREPARAR RESPUESTA CSV
+        # ==============================
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        filename = f"reporte_stock_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.write('\ufeff')  # BOM UTF-8
+
+        writer = csv.writer(response, delimiter=';')
+
+        # ==============================
+        # 4. ENCABEZADOS
+        # ==============================
+
+        if vista == "detallado":
+            headers = [
+                "Almacén", "Código", "Producto", "Categoría", "Unidad",
+                "Entradas", "Salidas", "Traslados",
+                "Stock Bueno", "Stock Dañado", "Stock Total"
+            ]
+        elif vista == "por_almacen":
+            headers = [
+                "Almacén", "Total Productos",
+                "Stock Bueno Total", "Stock Dañado Total", "Stock Total"
+            ]
+        else:
+            headers = [
+                "Código", "Producto", "Categoría", "Unidad",
+                "Almacenes con Stock", "Stock Bueno Total",
+                "Stock Dañado Total", "Stock Total"
+            ]
+
         writer.writerow(headers)
 
-        # 5. Iterar sobre la lista optimizada y escribir filas
-        for data in dataset_completo:
-            producto = data['producto']
-            almacen = data['almacen']
-            
-            row = [
-                almacen.nombre,
-                producto.codigo,
-                producto.nombre,
-                producto.categoria.nombre if producto.categoria else '',
-                producto.unidad_medida.nombre if producto.unidad_medida else '',
-                data['producto'].stock_minimo,
-                data['entradas_total'],
-                data['salidas_total'],
-                data['stock_bueno'],
-                data['stock_danado'],
-                data['stock_total']
-            ]
-            writer.writerow(row)
+        # ==============================
+        # 5. ESCRIBIR FILAS
+        # ==============================
+        for item in stocks:
+            writer.writerow(list(item.values()))
 
         return response
 
@@ -1892,23 +2003,6 @@ class ReporteStockRealAdmin(admin.ModelAdmin):
         producto_id = request.GET.get('producto', '')
         stock_minimo = request.GET.get('stock_minimo', '')
         solo_con_stock = request.GET.get('solo_con_stock', '')
-        
-        # 2. Conversión de tipos (necesaria para la llamada)
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
-        
-        # =================================================================
-        # 🚀 OPTIMIZACIÓN: Inserción aquí
-        # =================================================================
-
-        dataset_completo = ReporteStockReal.obtener_data_masiva(
-            almacen_id=almacen_id_int, # Usa el int(almacen_id)
-            categoria_id=categoria_id_int,
-            producto_id=producto_id_int,
-            stock_minimo=(stock_minimo=='on'),
-            solo_con_stock=(solo_con_stock=='on')
-        )
         
         # ✅ LÓGICA DE PAGINACIÓN UNIFICADA
         page = request.GET.get('page', 1)

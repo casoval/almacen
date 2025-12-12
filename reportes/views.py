@@ -9,8 +9,6 @@ import csv
 from decimal import Decimal
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from django.utils.translation import gettext_lazy as _
 
 from almacenes.models import MovimientoAlmacen, Almacen, DetalleMovimientoAlmacen
 from beneficiarios.models import MovimientoCliente, Cliente, DetalleMovimientoCliente
@@ -3757,190 +3755,180 @@ def obtener_detalle_estadistica_real(request):
 
 @staff_member_required
 def exportar_stock_real_excel(request):
-    """
-    Exporta el reporte de Stock Real a Excel (.xlsx) de manera optimizada
-    usando ReporteStockReal.obtener_data_masiva.
-    """
-    try:
-        # 1. Recuperar Filtros y Conversión de tipos
-        almacen_id = request.GET.get('almacen', '')
-        categoria_id = request.GET.get('categoria', '')
-        producto_id = request.GET.get('producto', '')
-        stock_minimo = request.GET.get('stock_minimo', '')
-        solo_con_stock = request.GET.get('solo_con_stock', '')
-        
-        # Conversión de tipos
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
-
-        # 2. 🚀 OBTENER DATOS MASIVOS OPTIMIZADOS (Una sola consulta grande)
-        dataset_completo = ReporteStockReal.obtener_data_masiva(
-            almacen_id=almacen_id_int,
-            categoria_id=categoria_id_int,
-            producto_id=producto_id_int,
-            stock_minimo=(stock_minimo=='on'),
-            solo_con_stock=(solo_con_stock=='on')
-        )
-        
-        # 3. Preparar el archivo Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "ReporteStockReal"
-        
-        # Estilos
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="337AB7", end_color="337AB7", fill_type="solid")
-        right_alignment = Alignment(horizontal="right", vertical="center")
-        center_alignment = Alignment(horizontal="center", vertical="center")
-
-        # Encabezados
-        headers = [
-            _("Almacén"), _("Código Producto"), _("Nombre Producto"), _("Categoría"), 
-            _("U/M"), _("Stock Mínimo"), 
-            _("E. Almacén"), _("S. Almacén"), 
-            _("T. Recibidos"), _("T. Enviados"), 
-            _("E. Cliente"), _("S. Cliente"), 
-            _("Stock Bueno"), _("Stock Dañado"), _("Stock Total")
-        ]
-        ws.append(headers)
-
-        # Aplicar estilos a la cabecera
-        for col_num, header in enumerate(headers, 1):
-            col_letter = get_column_letter(col_num)
-            cell = ws[f'{col_letter}1']
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_alignment
-        
-        # Ajustar ancho de columnas para mejor visualización (opcional)
-        ws.column_dimensions['C'].width = 40
-        ws.column_dimensions['E'].width = 10
-        
-        # 4. Iterar sobre la lista optimizada y escribir filas
-        for row_num, data in enumerate(dataset_completo, 2):
-            producto = data['producto']
-            almacen = data['almacen']
+    """Exporta el reporte de stock REAL a Excel"""
+    
+    vista = request.GET.get('vista', 'detallado')
+    almacen_id = request.GET.get('almacen', '')
+    categoria_id = request.GET.get('categoria', '')
+    producto_id = request.GET.get('producto', '')
+    solo_con_stock = request.GET.get('solo_con_stock', '')
+    
+    from reportes.models import ReporteStockReal
+    
+    # Obtener almacenes y productos filtrados
+    almacenes = Almacen.objects.filter(activo=True)
+    if almacen_id:
+        almacenes = almacenes.filter(id=almacen_id)
+    
+    productos = Producto.objects.filter(activo=True)
+    if categoria_id:
+        productos = productos.filter(categoria_id=categoria_id)
+    if producto_id:
+        productos = productos.filter(id=producto_id)
+    
+    # Crear workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Stock Real"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Encabezados
+    headers = ['Almacén', 'Código', 'Producto', 'Categoría', 'Unidad', 
+               'Ent. Almacén', 'Sal. Almacén', 'Trasl. Recib.', 'Trasl. Env.',
+               'Ent. Cliente', 'Sal. Cliente', 'Stock Bueno', 'Stock Dañado', 'Stock Total']
+    
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+    
+    # Datos
+    row_idx = 2
+    for almacen in almacenes:
+        for producto in productos:
+            stock_data = ReporteStockReal.calcular_stock_real_producto_almacen(
+                producto, almacen
+            )
             
-            row = [
+            if solo_con_stock and stock_data['stock_total'] == 0:
+                continue
+            
+            row_data = [
                 almacen.nombre,
                 producto.codigo,
                 producto.nombre,
-                producto.categoria.nombre if producto.categoria else '',
-                producto.unidad_medida.nombre if producto.unidad_medida else '',
-                producto.stock_minimo,
-                # Totales de Movimientos
-                data['entradas_almacen_total'],
-                data['salidas_almacen_total'],
-                data['traslados_recibidos_total'],
-                data['traslados_enviados_total'],
-                data['entradas_cliente_total'], 
-                data['salidas_cliente_total'],  
-                # Stock Final
-                data['stock_bueno'],
-                data['stock_danado'],
-                data['stock_total']
+                producto.categoria.nombre if producto.categoria else '-',
+                producto.unidad_medida.abreviatura if producto.unidad_medida else 'UND',
+                stock_data['entradas_almacen_total'],
+                stock_data['salidas_almacen_total'],
+                stock_data['traslados_recibidos_total'],
+                stock_data['traslados_enviados_total'],
+                stock_data['entradas_cliente_total'],
+                stock_data['salidas_cliente_total'],
+                stock_data['stock_bueno'],
+                stock_data['stock_danado'],
+                stock_data['stock_total']
             ]
-            ws.append(row)
             
-            # Aplicar formato de números (columnas G a O) y alineación
-            for col_idx in range(7, 16): 
-                col_letter = get_column_letter(col_idx)
-                cell = ws[f'{col_letter}{row_num}']
-                cell.number_format = '#,##0.00'
-                cell.alignment = right_alignment
-                
-            # Resaltar si está bajo stock mínimo
-            if producto.stock_minimo and data['stock_bueno'] <= producto.stock_minimo:
-                 red_fill = PatternFill(start_color="F5C3C2", end_color="F5C3C2", fill_type="solid")
-                 for col_idx in range(1, 16):
-                    col_letter = get_column_letter(col_idx)
-                    ws[f'{col_letter}{row_num}'].fill = red_fill
+            for col, value in enumerate(row_data, start=1):
+                cell = ws.cell(row=row_idx, column=col, value=value)
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            row_idx += 1
+    
+    # Ajustar columnas
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column].width = adjusted_width
+    
+    # Respuesta HTTP
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f'stock_real_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    
+    wb.save(response)
+    return response
 
-        # 5. Configurar y devolver la respuesta HTTP
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="ReporteStockReal_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        wb.save(response)
-        return response
-
-    except Exception as e:
-        # Esto ayuda a diagnosticar errores en producción
-        return HttpResponse(f"Error al exportar a Excel: {e}\n{traceback.format_exc()}", status=500)
 
 @staff_member_required
 def exportar_stock_real_csv(request):
-    """
-    Exporta el reporte de Stock Real a CSV de manera optimizada.
-    """
-    try:
-        # 1. Recuperar Filtros
-        almacen_id = request.GET.get('almacen', '')
-        categoria_id = request.GET.get('categoria', '')
-        producto_id = request.GET.get('producto', '')
-        stock_minimo = request.GET.get('stock_minimo', '')
-        solo_con_stock = request.GET.get('solo_con_stock', '')
-        
-        # Conversión de tipos
-        almacen_id_int = int(almacen_id) if almacen_id else None
-        categoria_id_int = int(categoria_id) if categoria_id else None
-        producto_id_int = int(producto_id) if producto_id else None
-
-        # 2. 🚀 OBTENER DATOS MASIVOS OPTIMIZADOS (Una sola consulta grande)
-        dataset_completo = ReporteStockReal.obtener_data_masiva(
-            almacen_id=almacen_id_int,
-            categoria_id=categoria_id_int,
-            producto_id=producto_id_int,
-            stock_minimo=(stock_minimo=='on'),
-            solo_con_stock=(solo_con_stock=='on')
-        )
-        
-        # 3. Preparar la respuesta HTTP para CSV
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="ReporteStockReal_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-        response.write(u'\ufeff'.encode('utf8')) # BOM para UTF-8 y compatibilidad con Excel
-        
-        writer = csv.writer(response)
-
-        # 4. Escribir la cabecera
-        headers = [
-            _("Almacén"), _("Código Producto"), _("Nombre Producto"), _("Categoría"), 
-            _("U/M"), _("Stock Mínimo"), 
-            _("E. Almacén"), _("S. Almacén"), 
-            _("T. Recibidos"), _("T. Enviados"), 
-            _("E. Cliente"), _("S. Cliente"), 
-            _("Stock Bueno"), _("Stock Dañado"), _("Stock Total")
-        ]
-        writer.writerow(headers)
-
-        # 5. Iterar sobre la lista optimizada y escribir filas
-        for data in dataset_completo:
-            producto = data['producto']
-            almacen = data['almacen']
+    """Exporta el reporte de stock REAL a CSV"""
+    
+    almacen_id = request.GET.get('almacen', '')
+    categoria_id = request.GET.get('categoria', '')
+    producto_id = request.GET.get('producto', '')
+    solo_con_stock = request.GET.get('solo_con_stock', '')
+    
+    from reportes.models import ReporteStockReal
+    
+    # Obtener almacenes y productos filtrados
+    almacenes = Almacen.objects.filter(activo=True)
+    if almacen_id:
+        almacenes = almacenes.filter(id=almacen_id)
+    
+    productos = Producto.objects.filter(activo=True)
+    if categoria_id:
+        productos = productos.filter(categoria_id=categoria_id)
+    if producto_id:
+        productos = productos.filter(id=producto_id)
+    
+    # Respuesta HTTP
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    filename = f'stock_real_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    
+    # BOM para Excel
+    response.write('\ufeff')
+    
+    writer = csv.writer(response, delimiter=';')
+    
+    # Encabezados
+    headers = ['Almacén', 'Código', 'Producto', 'Categoría', 'Unidad',
+               'Ent. Almacén', 'Sal. Almacén', 'Trasl. Recib.', 'Trasl. Env.',
+               'Ent. Cliente', 'Sal. Cliente', 'Stock Bueno', 'Stock Dañado', 'Stock Total']
+    writer.writerow(headers)
+    
+    # Datos
+    for almacen in almacenes:
+        for producto in productos:
+            stock_data = ReporteStockReal.calcular_stock_real_producto_almacen(
+                producto, almacen
+            )
             
-            row = [
+            if solo_con_stock and stock_data['stock_total'] == 0:
+                continue
+            
+            row_data = [
                 almacen.nombre,
                 producto.codigo,
                 producto.nombre,
-                producto.categoria.nombre if producto.categoria else '',
-                producto.unidad_medida.nombre if producto.unidad_medida else '',
-                str(data['producto'].stock_minimo or ''), # Convertir a string para CSV
-                str(data['entradas_almacen_total']),
-                str(data['salidas_almacen_total']),
-                str(data['traslados_recibidos_total']),
-                str(data['traslados_enviados_total']),
-                str(data['entradas_cliente_total']),
-                str(data['salidas_cliente_total']),
-                str(data['stock_bueno']),
-                str(data['stock_danado']),
-                str(data['stock_total'])
+                producto.categoria.nombre if producto.categoria else '-',
+                producto.unidad_medida.abreviatura if producto.unidad_medida else 'UND',
+                stock_data['entradas_almacen_total'],
+                stock_data['salidas_almacen_total'],
+                stock_data['traslados_recibidos_total'],
+                stock_data['traslados_enviados_total'],
+                stock_data['entradas_cliente_total'],
+                stock_data['salidas_cliente_total'],
+                stock_data['stock_bueno'],
+                stock_data['stock_danado'],
+                stock_data['stock_total']
             ]
-            writer.writerow(row)
-
-        return response
-
-    except Exception as e:
-        return HttpResponse(f"Error al exportar a CSV: {e}\n{traceback.format_exc()}", status=500)
+            writer.writerow(row_data)
+    
+    return response
 
 @staff_member_required
 def obtener_detalle_estadistica_entregas(request):

@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Sum, Count, Q, F, Case, When, Value, DecimalField
-from django.db.models.functions import Coalesce
+from django.db.models import Sum, Count, Q, F
 from decimal import Decimal
 
 
@@ -205,40 +204,6 @@ class ReporteMovimiento(models.Model):
         resultado = sorted(productos_dict.values(), key=lambda x: x['total_cantidad'], reverse=True)
         return resultado[:limite]
 
-    @staticmethod
-    def obtener_estadisticas_rapidas(fecha_inicio=None, fecha_fin=None):
-        """
-        Versión optimizada que hace una sola query para estadísticas
-        en lugar de múltiples counts separados.
-        """
-        from almacenes.models import MovimientoAlmacen
-        from beneficiarios.models import MovimientoCliente
-        
-        filtros = Q()
-        if fecha_inicio: filtros &= Q(fecha__gte=fecha_inicio)
-        if fecha_fin: filtros &= Q(fecha__lte=fecha_fin)
-        
-        # 1. Stats Almacén (1 sola query)
-        stats_alm = MovimientoAlmacen.objects.filter(filtros).aggregate(
-            total=Count('id'),
-            entradas=Count('id', filter=Q(tipo='ENTRADA')),
-            salidas=Count('id', filter=Q(tipo='SALIDA')),
-            traslados=Count('id', filter=Q(tipo='TRASLADO'))
-        )
-        
-        # 2. Stats Clientes (1 sola query)
-        stats_cli = MovimientoCliente.objects.filter(filtros).aggregate(
-            total=Count('id'),
-            entradas=Count('id', filter=Q(tipo='ENTRADA')),
-            salidas=Count('id', filter=Q(tipo='SALIDA')),
-            traslados=Count('id', filter=Q(tipo='TRASLADO'))
-        )
-        
-        return {
-            'total_global': (stats_alm['total'] or 0) + (stats_cli['total'] or 0),
-            'almacen': stats_alm,
-            'cliente': stats_cli
-        }
 
 # ==============================================================================
 # REPORTE DE ENTREGAS (Implementación corregida) ⭐
@@ -343,412 +308,249 @@ class ReporteEntregas(models.Model):
             'resumen_productos_top': top_productos_list,
         }
 
-    @staticmethod
-    def obtener_entregas_optimizadas(fecha_inicio=None, fecha_fin=None, cliente_id=None, categoria_id=None, producto_id=None):
-        """
-        Realiza la agregación en Base de Datos usando Conditional Aggregation.
-        Evita recorrer fila por fila en Python.
-        """
-        from beneficiarios.models import DetalleMovimientoCliente, Cliente
-        from productos.models import Producto
-
-        # 1. Filtros Base
-        filtros = Q()
-        if fecha_inicio: filtros &= Q(movimiento__fecha__gte=fecha_inicio)
-        if fecha_fin: filtros &= Q(movimiento__fecha__lte=fecha_fin)
-        if categoria_id: filtros &= Q(producto__categoria_id=categoria_id)
-        if producto_id: filtros &= Q(producto_id=producto_id)
-        
-        # Filtros de cliente (complejo porque puede ser origen, destino o principal)
-        if cliente_id:
-            filtros &= (
-                Q(movimiento__cliente_id=cliente_id) | 
-                Q(movimiento__cliente_origen_id=cliente_id) | 
-                Q(movimiento__cliente_destino_id=cliente_id)
-            )
-
-        # 2. Queryset Base
-        qs = DetalleMovimientoCliente.objects.filter(filtros).select_related(
-            'movimiento', 'producto', 'producto__unidad_medida', 'producto__categoria'
-        )
-
-        # 3. Diccionario para agrupar en memoria (pero con datos ya pre-filtrados)
-        # Hacemos esto en memoria porque agrupar por "Cliente Efectivo" (que cambia según si es origen/destino)
-        # es muy complejo en una sola query SQL pura sin subqueries lentas.
-        
-        reporte = {} 
-
-        # Optimizamos iterando sobre values() que es más rápido que crear objetos Modelo
-        datos_raw = qs.annotate(
-            cli_principal=F('movimiento__cliente_id'),
-            cli_origen=F('movimiento__cliente_origen_id'),
-            cli_destino=F('movimiento__cliente_destino_id'),
-            tipo_mov=F('movimiento__tipo'),
-            prod_id=F('producto_id'),
-            cant=F('cantidad'),
-            cant_dan=F('cantidad_danada')
-        ).values(
-            'cli_principal', 'cli_origen', 'cli_destino', 'tipo_mov', 'prod_id', 
-            'cant', 'cant_dan', 'movimiento_id'
-        )
-
-        # Cache de nombres para no hacer N queries
-        clientes_cache = {c.id: c for c in Cliente.objects.filter(activo=True)}
-        productos_cache = {p.id: p for p in Producto.objects.select_related('categoria', 'unidad_medida').all()}
-
-        for row in datos_raw:
-            pid = row['prod_id']
-            tipo = row['tipo_mov']
-            total = (row['cant'] or 0) + (row['cant_dan'] or 0)
-            bueno = (row['cant'] or 0)
-            danado = (row['cant_dan'] or 0)
-            mov_id = row['movimiento_id']
-
-            # Función helper para procesar la fila
-            def agregar_registro(cid, tipo_registro):
-                if not cid or cid not in clientes_cache or pid not in productos_cache: return
-                
-                key = (cid, pid)
-                if key not in reporte:
-                    reporte[key] = {
-                        'cliente': clientes_cache[cid],
-                        'producto': productos_cache[pid],
-                        'total_entregas_ids': set(),
-                        'cantidad_entrada': 0, 'cantidad_salida': 0,
-                        'cantidad_traslado_origen': 0, 'cantidad_traslado_destino': 0,
-                        'stock_bueno': 0, 'stock_danado': 0, 'stock_total': 0
-                    }
-                
-                r = reporte[key]
-                r['total_entregas_ids'].add(mov_id)
-                
-                if tipo_registro == 'ENTRADA':
-                    r['cantidad_entrada'] += total
-                    r['stock_bueno'] += bueno
-                    r['stock_danado'] += danado
-                elif tipo_registro == 'SALIDA':
-                    r['cantidad_salida'] += total
-                    r['stock_bueno'] -= bueno
-                    r['stock_danado'] -= danado
-                elif tipo_registro == 'T_ORIGEN': # Sale del cliente
-                    r['cantidad_traslado_origen'] += total
-                    r['stock_bueno'] -= bueno
-                    r['stock_danado'] -= danado
-                elif tipo_registro == 'T_DESTINO': # Entra al cliente
-                    r['cantidad_traslado_destino'] += total
-                    r['stock_bueno'] += bueno
-                    r['stock_danado'] += danado
-
-            # Lógica de distribución
-            if tipo == 'TRASLADO':
-                if row['cli_origen']: agregar_registro(row['cli_origen'], 'T_ORIGEN')
-                if row['cli_destino']: agregar_registro(row['cli_destino'], 'T_DESTINO')
-            elif tipo == 'ENTRADA':
-                agregar_registro(row['cli_principal'], 'ENTRADA')
-            elif tipo == 'SALIDA':
-                agregar_registro(row['cli_principal'], 'SALIDA')
-
-        # Convertir a lista plana
-        resultado = []
-        for data in reporte.values():
-            data['total_entregas'] = len(data['total_entregas_ids'])
-            data['stock_total'] = data['stock_bueno'] + data['stock_danado']
-            del data['total_entregas_ids'] # Limpiar memoria
-            resultado.append(data)
-            
-        return resultado
-
 # ==============================================================================
-# REPORTE DE STOCK (OPTIMIZADO)
+# REPORTE DE STOCK (Implementación completa) ⭐
 # ==============================================================================
+
 class ReporteStock(models.Model):
+    """
+    Modelo proxy para reportes de stock actual
+    """
+    
     class Meta:
         managed = False
         verbose_name = _("Reporte de Stock")
         verbose_name_plural = _("6.2. Reporte Exclusivo de Movimientos de Almacenes")
         
+    # ⭐ Implementación del método que trae los datos de stock
     @staticmethod
-    def obtener_data_stock_masivo(almacen_id=None, categoria_id=None, producto_id=None, stock_minimo=False, solo_con_stock=False):
+    def obtener_data_stock_actual(almacen_id=None, categoria_id=None, producto_id=None):
         """
-        OPTIMIZACIÓN: Realiza una sola consulta agrupada para obtener el stock.
-        Reduce de N*M consultas a 1 sola consulta.
+        Obtiene el stock actual agrupado por producto, filtrando por almacén y/o categoría.
+        Stock = Suma(Entradas) - Suma(Salidas)
         """
         from almacenes.models import DetalleMovimientoAlmacen
         from productos.models import Producto
-
-        # 1. Base de productos
-        productos = Producto.objects.filter(activo=True).select_related('categoria', 'unidad_medida')
+        
+        qs_productos = Producto.objects.filter(activo=True).select_related('categoria', 'unidad_medida')
+        
         if categoria_id:
-            productos = productos.filter(categoria_id=categoria_id)
+            qs_productos = qs_productos.filter(categoria_id=categoria_id)
         if producto_id:
-            productos = productos.filter(id=producto_id)
+            qs_productos = qs_productos.filter(id=producto_id)
             
-        productos_map = {p.id: p for p in productos}
-        producto_ids = list(productos_map.keys())
+        data = []
+        for producto in qs_productos:
+            # 1. Calcular Entradas para este producto
+            # Entradas: Movimiento tipo ENTRADA o TRASPASO con almacen_destino_id
+            q_entradas = Q(movimiento__tipo__in=['ENTRADA', 'TRASPASO']) & Q(producto=producto)
+            if almacen_id:
+                # Si se filtra por almacén, las entradas son aquellas que TIENEN ese almacén como DESTINO
+                q_entradas &= Q(movimiento__almacen_destino_id=almacen_id)
 
-        # 2. Consulta Agregada (El corazón de la optimización)
-        # Filtramos por los productos seleccionados para no traer toda la DB
-        qs = DetalleMovimientoAlmacen.objects.filter(producto_id__in=producto_ids)
+            entradas_agg = DetalleMovimientoAlmacen.objects.filter(q_entradas).aggregate(
+                total_cantidad=Sum('cantidad'),
+                total_danada=Sum('cantidad_danada')
+            )
+            
+            # 2. Calcular Salidas para este producto
+            # Salidas: Movimiento tipo SALIDA o TRASPASO con almacen_origen_id
+            q_salidas = Q(movimiento__tipo__in=['SALIDA', 'TRASPASO']) & Q(producto=producto)
+            if almacen_id:
+                # Si se filtra por almacén, las salidas son aquellas que TIENEN ese almacén como ORIGEN
+                q_salidas &= Q(movimiento__almacen_origen_id=almacen_id)
+
+            salidas_agg = DetalleMovimientoAlmacen.objects.filter(q_salidas).aggregate(
+                total_cantidad=Sum('cantidad'),
+                total_danada=Sum('cantidad_danada')
+            )
+            
+            stock_bueno = (entradas_agg['total_cantidad'] or 0) - (salidas_agg['total_cantidad'] or 0)
+            stock_danado = (entradas_agg['total_danada'] or 0) - (salidas_agg['total_danada'] or 0)
+            stock_total = stock_bueno + stock_danado
+            
+            # Solo incluir productos con stock total > 0 (opcional, pero útil)
+            if stock_total > 0:
+                data.append({
+                    'id': producto.id,
+                    'codigo': producto.codigo,
+                    'nombre': producto.nombre,
+                    'unidad': producto.unidad_medida.abreviatura if producto.unidad_medida else '-',
+                    'categoria': producto.categoria.nombre if producto.categoria else '-',
+                    'stock_bueno': stock_bueno,
+                    'stock_danado': stock_danado,
+                    'stock_total': stock_total,
+                })
         
-        # Filtro de almacén previo a la agregación
-        filtros_destino = Q()
-        filtros_origen = Q()
-        
-        if almacen_id:
-            filtros_destino = Q(movimiento__almacen_destino_id=almacen_id)
-            filtros_origen = Q(movimiento__almacen_origen_id=almacen_id)
-
-        # Agrupamos por Producto y Almacén
-        # Calculamos Entradas (Donde el almacén es Destino)
-        entradas = qs.filter(
-            filtros_destino,
-            movimiento__tipo__in=['ENTRADA', 'TRASPASO', 'TRASLADO']
-        ).values('producto_id', 'movimiento__almacen_destino_id').annotate(
-            cant_buena=Sum('cantidad'),
-            cant_danada=Sum('cantidad_danada')
-        )
-
-        # Calculamos Salidas (Donde el almacén es Origen)
-        salidas = qs.filter(
-            filtros_origen,
-            movimiento__tipo__in=['SALIDA', 'TRASPASO', 'TRASLADO']
-        ).values('producto_id', 'movimiento__almacen_origen_id').annotate(
-            cant_buena=Sum('cantidad'),
-            cant_danada=Sum('cantidad_danada')
-        )
-
-        # 3. Procesamiento en Memoria (Mucho más rápido que DB hits repetidos)
-        reporte = {} # Key: (almacen_id, producto_id)
-
-        # Procesar Entradas
-        for e in entradas:
-            alm_id = e['movimiento__almacen_destino_id']
-            if not alm_id: continue
-            prod_id = e['producto_id']
-            key = (alm_id, prod_id)
-            
-            if key not in reporte: reporte[key] = _init_stock_struct()
-            
-            reporte[key]['entradas_total'] += (e['cant_buena'] or 0) + (e['cant_danada'] or 0)
-            reporte[key]['stock_bueno'] += (e['cant_buena'] or 0)
-            reporte[key]['stock_danado'] += (e['cant_danada'] or 0)
-
-        # Procesar Salidas
-        for s in salidas:
-            alm_id = e['movimiento__almacen_origen_id'] if 'movimiento__almacen_origen_id' in s else s.get('movimiento__almacen_origen_id') # Safety check
-            # Nota: en .values() el nombre del campo debe ser exacto.
-            # Corrigiendo lógica de acceso:
-            alm_id = s['movimiento__almacen_origen_id']
-
-            if not alm_id: continue
-            prod_id = s['producto_id']
-            key = (alm_id, prod_id)
-            
-            if key not in reporte: reporte[key] = _init_stock_struct()
-            
-            reporte[key]['salidas_total'] += (s['cant_buena'] or 0) + (s['cant_danada'] or 0)
-            reporte[key]['stock_bueno'] -= (s['cant_buena'] or 0)
-            reporte[key]['stock_danado'] -= (s['cant_danada'] or 0)
-
-        # 4. Construir lista final con objetos Producto y Almacén reales
-        from almacenes.models import Almacen
-        almacenes_map = {a.id: a for a in Almacen.objects.filter(activo=True)}
-        
-        resultado_final = []
-        
-        for (alm_id, prod_id), data in reporte.items():
-            if alm_id not in almacenes_map or prod_id not in productos_map:
-                continue
-                
-            data['stock_total'] = data['stock_bueno'] + data['stock_danado']
-            data['almacen'] = almacenes_map[alm_id]
-            data['producto'] = productos_map[prod_id]
-            
-            # Filtros post-cálculo
-            if solo_con_stock and data['stock_total'] == 0:
-                continue
-                
-            prod_obj = productos_map[prod_id]
-            if stock_minimo and prod_obj.stock_minimo and data['stock_bueno'] > prod_obj.stock_minimo:
-                continue
-
-            resultado_final.append(data)
-            
-        return resultado_final
-
-def _init_stock_struct():
-    return {
-        'entradas_total': Decimal('0'),
-        'salidas_total': Decimal('0'),
-        'stock_bueno': Decimal('0'),
-        'stock_danado': Decimal('0'),
-        'stock_total': Decimal('0'),
-        'traslados_netos_total': Decimal('0') # Simplificado para este reporte
-    }
+        return data
 
 # ==============================================================================
-# REPORTE DE STOCK REAL (OPTIMIZADO EXTREMO)
+# REPORTE DE STOCK REAL DE ALMACENES (considera movimientos de clientes)
 # ==============================================================================
+
 class ReporteStockReal(models.Model):
+    """
+    Modelo proxy para reportes de stock real de almacenes
+    Calcula el stock considerando TANTO movimientos de almacén COMO de clientes
+    """
+    
     class Meta:
         managed = False
         verbose_name = _("Reporte de Stock Real")
         verbose_name_plural = _("6.4. Reporte de Stock Real de Almacenes")
     
     @staticmethod
-    def obtener_data_masiva(almacen_id=None, categoria_id=None, producto_id=None, stock_minimo=False, solo_con_stock=False):
-        """
-        Obtiene el stock real cruzando almacenes y clientes en una sola pasada.
-        Evita 6 subconsultas por fila.
-        """
-        from almacenes.models import DetalleMovimientoAlmacen, Almacen
-        from beneficiarios.models import DetalleMovimientoCliente
-        from productos.models import Producto
-        
-        # 1. Preparar catálogos en memoria (Cache local)
-        filtros_prod = {'activo': True}
-        if categoria_id: filtros_prod['categoria_id'] = categoria_id
-        if producto_id: filtros_prod['id'] = producto_id
-        
-        productos_map = {p.id: p for p in Producto.objects.filter(**filtros_prod).select_related('categoria', 'unidad_medida')}
-        producto_ids_list = list(productos_map.keys())
-        
-        filtros_alm = {'activo': True}
-        if almacen_id: filtros_alm['id'] = almacen_id
-        almacenes_map = {a.id: a for a in Almacen.objects.filter(**filtros_alm)}
-        almacen_ids_list = list(almacenes_map.keys())
-
-        # Estructura de datos: dict[(almacen_id, producto_id)] = {datos...}
-        stock_map = {}
-
-        def get_node(aid, pid):
-            key = (aid, pid)
-            if key not in stock_map:
-                stock_map[key] = {
-                    'entradas_almacen_total': Decimal(0), 'salidas_almacen_total': Decimal(0),
-                    'traslados_recibidos_total': Decimal(0), 'traslados_enviados_total': Decimal(0),
-                    'entradas_cliente_total': Decimal(0), 'salidas_cliente_total': Decimal(0),
-                    'stock_bueno': Decimal(0), 'stock_danado': Decimal(0), 'stock_total': Decimal(0)
-                }
-            return stock_map[key]
-
-        # ---------------------------------------------------------
-        # FASE 1: AGREGACIÓN DE ALMACÉN (Base de datos hace la suma)
-        # ---------------------------------------------------------
-        qs_alm = DetalleMovimientoAlmacen.objects.filter(
-            producto_id__in=producto_ids_list
-        ).values(
-            'producto_id', 'movimiento__tipo', 
-            'movimiento__almacen_origen_id', 'movimiento__almacen_destino_id'
-        ).annotate(
-            total_bueno=Sum('cantidad'),
-            total_danado=Sum('cantidad_danada')
-        )
-        
-        for item in qs_alm:
-            pid = item['producto_id']
-            tipo = item['movimiento__tipo']
-            origen_id = item['movimiento__almacen_origen_id']
-            destino_id = item['movimiento__almacen_destino_id']
-            cant_b = item['total_bueno'] or 0
-            cant_d = item['total_danado'] or 0
-            total = cant_b + cant_d
-
-            # Lógica de signos
-            # Si el almacén es DESTINO (Entrada/Recibe)
-            if destino_id and destino_id in almacenes_map:
-                node = get_node(destino_id, pid)
-                if tipo == 'ENTRADA':
-                    node['entradas_almacen_total'] += total
-                    node['stock_bueno'] += cant_b
-                    node['stock_danado'] += cant_d
-                elif tipo == 'TRASLADO':
-                    node['traslados_recibidos_total'] += total
-                    node['stock_bueno'] += cant_b
-                    node['stock_danado'] += cant_d
-            
-            # Si el almacén es ORIGEN (Salida/Envía)
-            if origen_id and origen_id in almacenes_map:
-                node = get_node(origen_id, pid)
-                if tipo == 'SALIDA':
-                    node['salidas_almacen_total'] += total
-                    node['stock_bueno'] -= cant_b
-                    node['stock_danado'] -= cant_d
-                elif tipo == 'TRASLADO':
-                    node['traslados_enviados_total'] += total
-                    node['stock_bueno'] -= cant_b
-                    node['stock_danado'] -= cant_d
-
-        # ---------------------------------------------------------
-        # FASE 2: AGREGACIÓN DE CLIENTES
-        # ---------------------------------------------------------
-        qs_cli = DetalleMovimientoCliente.objects.filter(
-            producto_id__in=producto_ids_list
-        ).values(
-            'producto_id', 'movimiento__tipo',
-            'movimiento__almacen_origen_id', 'movimiento__almacen_destino_id'
-        ).annotate(
-            total_bueno=Sum('cantidad'),
-            total_danado=Sum('cantidad_danada')
-        )
-
-        for item in qs_cli:
-            pid = item['producto_id']
-            tipo = item['movimiento__tipo']
-            origen_id = item['movimiento__almacen_origen_id']
-            destino_id = item['movimiento__almacen_destino_id']
-            cant_b = item['total_bueno'] or 0
-            cant_d = item['total_danado'] or 0
-            total = cant_b + cant_d
-
-            # Ojo: En clientes, "ENTRADA" significa que SALE del almacén hacia el cliente (RESTA del almacén)
-            if origen_id and origen_id in almacenes_map and tipo == 'ENTRADA':
-                node = get_node(origen_id, pid)
-                node['entradas_cliente_total'] += total
-                node['stock_bueno'] -= cant_b
-                node['stock_danado'] -= cant_d
-            
-            # Ojo: En clientes, "SALIDA" significa que regresa del cliente (SUMA al almacén)
-            if destino_id and destino_id in almacenes_map and tipo == 'SALIDA':
-                node = get_node(destino_id, pid)
-                node['salidas_cliente_total'] += total
-                node['stock_bueno'] += cant_b
-                node['stock_danado'] += cant_d
-
-        # ---------------------------------------------------------
-        # FASE 3: CONSTRUCCIÓN DE LA LISTA FINAL
-        # ---------------------------------------------------------
-        resultado = []
-        for (aid, pid), data in stock_map.items():
-            # Filtros finales
-            data['stock_total'] = data['stock_bueno'] + data['stock_danado']
-            
-            # Filtro solo con stock (incluye negativos para alertar)
-            if solo_con_stock and data['stock_total'] == 0:
-                continue
-
-            # Inyectar objetos reales
-            data['almacen'] = almacenes_map[aid]
-            data['producto'] = productos_map[pid]
-            
-            # Filtro stock mínimo
-            if stock_minimo and productos_map[pid].stock_minimo and data['stock_bueno'] > productos_map[pid].stock_minimo:
-                continue
-
-            resultado.append(data)
-            
-        return resultado
-        
-    @staticmethod
     def calcular_stock_real_producto_almacen(producto, almacen):
-        """Mantiene compatibilidad con vistas individuales, pero no usar en listas."""
-        # Se puede reimplementar llamando a obtener_data_masiva filtrado
-        res = ReporteStockReal.obtener_data_masiva(almacen_id=almacen.id, producto_id=producto.id)
-        if res:
-            return res[0]
+        """
+        Calcula el stock REAL de un producto en un almacén específico
+        Considera movimientos de almacén Y movimientos de clientes
+        
+        FÓRMULA:
+        Stock Real = 
+          + Entradas de Almacén
+          - Salidas de Almacén
+          + Traslados Recibidos (de otros almacenes)
+          - Traslados Enviados (a otros almacenes)
+          - Entradas de Cliente (salen del almacén hacia cliente)
+          + Salidas de Cliente (regresan del cliente al almacén)
+        """
+        from almacenes.models import DetalleMovimientoAlmacen
+        from beneficiarios.models import DetalleMovimientoCliente
+        from decimal import Decimal
+        
+        # ====== MOVIMIENTOS DE ALMACÉN ======
+        
+        # 1. ENTRADAS de almacén (productos que ingresan)
+        entradas_almacen = DetalleMovimientoAlmacen.objects.filter(
+            movimiento__tipo='ENTRADA',
+            movimiento__almacen_destino=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        entradas_alm_buena = Decimal(str(entradas_almacen['buena'] or 0))
+        entradas_alm_danada = Decimal(str(entradas_almacen['danada'] or 0))
+        
+        # 2. SALIDAS de almacén (productos que salen)
+        salidas_almacen = DetalleMovimientoAlmacen.objects.filter(
+            movimiento__tipo='SALIDA',
+            movimiento__almacen_origen=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        salidas_alm_buena = Decimal(str(salidas_almacen['buena'] or 0))
+        salidas_alm_danada = Decimal(str(salidas_almacen['danada'] or 0))
+        
+        # 3. TRASLADOS RECIBIDOS (de otros almacenes hacia este)
+        traslados_recibidos = DetalleMovimientoAlmacen.objects.filter(
+            movimiento__tipo='TRASLADO',
+            movimiento__almacen_destino=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        traslados_rec_buena = Decimal(str(traslados_recibidos['buena'] or 0))
+        traslados_rec_danada = Decimal(str(traslados_recibidos['danada'] or 0))
+        
+        # 4. TRASLADOS ENVIADOS (desde este almacén a otros)
+        traslados_enviados = DetalleMovimientoAlmacen.objects.filter(
+            movimiento__tipo='TRASLADO',
+            movimiento__almacen_origen=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        traslados_env_buena = Decimal(str(traslados_enviados['buena'] or 0))
+        traslados_env_danada = Decimal(str(traslados_enviados['danada'] or 0))
+        
+        # ====== MOVIMIENTOS DE CLIENTE ======
+        
+        # 5. ENTRADAS de cliente (productos que SALEN del almacén hacia clientes)
+        entradas_cliente = DetalleMovimientoCliente.objects.filter(
+            movimiento__tipo='ENTRADA',
+            movimiento__almacen_origen=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        entradas_cli_buena = Decimal(str(entradas_cliente['buena'] or 0))
+        entradas_cli_danada = Decimal(str(entradas_cliente['danada'] or 0))
+        
+        # 6. SALIDAS de cliente (productos que REGRESAN del cliente al almacén)
+        salidas_cliente = DetalleMovimientoCliente.objects.filter(
+            movimiento__tipo='SALIDA',
+            movimiento__almacen_destino=almacen,
+            producto=producto
+        ).aggregate(
+            buena=Sum('cantidad'),
+            danada=Sum('cantidad_danada')
+        )
+        
+        salidas_cli_buena = Decimal(str(salidas_cliente['buena'] or 0))
+        salidas_cli_danada = Decimal(str(salidas_cliente['danada'] or 0))
+        
+        # NOTA: Ignoramos TRASLADO entre clientes (no afectan stock de almacén)
+        
+        # ====== CÁLCULO FINAL ======
+        
+        stock_bueno = (
+            entradas_alm_buena +           # Suma: entradas de almacén
+            traslados_rec_buena -          # Suma: traslados recibidos
+            salidas_alm_buena -            # Resta: salidas de almacén
+            traslados_env_buena -          # Resta: traslados enviados
+            entradas_cli_buena +           # Resta: entradas de cliente (salen del almacén)
+            salidas_cli_buena              # Suma: salidas de cliente (regresan al almacén)
+        )
+        
+        stock_danado = (
+            entradas_alm_danada +
+            traslados_rec_danada -
+            salidas_alm_danada -
+            traslados_env_danada -
+            entradas_cli_danada +
+            salidas_cli_danada
+        )
+        
         return {
-             'entradas_almacen_total': 0, 'salidas_almacen_total': 0,
-             'traslados_recibidos_total': 0, 'traslados_enviados_total': 0,
-             'entradas_cliente_total': 0, 'salidas_cliente_total': 0,
-             'stock_bueno': 0, 'stock_danado': 0, 'stock_total': 0
+            # Movimientos de Almacén
+            'entradas_almacen_buena': float(entradas_alm_buena),
+            'entradas_almacen_danada': float(entradas_alm_danada),
+            'entradas_almacen_total': float(entradas_alm_buena + entradas_alm_danada),
+            
+            'salidas_almacen_buena': float(salidas_alm_buena),
+            'salidas_almacen_danada': float(salidas_alm_danada),
+            'salidas_almacen_total': float(salidas_alm_buena + salidas_alm_danada),
+            
+            'traslados_recibidos_buena': float(traslados_rec_buena),
+            'traslados_recibidos_danada': float(traslados_rec_danada),
+            'traslados_recibidos_total': float(traslados_rec_buena + traslados_rec_danada),
+            
+            'traslados_enviados_buena': float(traslados_env_buena),
+            'traslados_enviados_danada': float(traslados_env_danada),
+            'traslados_enviados_total': float(traslados_env_buena + traslados_env_danada),
+            
+            # Movimientos de Cliente
+            'entradas_cliente_buena': float(entradas_cli_buena),
+            'entradas_cliente_danada': float(entradas_cli_danada),
+            'entradas_cliente_total': float(entradas_cli_buena + entradas_cli_danada),
+            
+            'salidas_cliente_buena': float(salidas_cli_buena),
+            'salidas_cliente_danada': float(salidas_cli_danada),
+            'salidas_cliente_total': float(salidas_cli_buena + salidas_cli_danada),
+            
+            # Stock Real Final
+            'stock_bueno': float(stock_bueno),
+            'stock_danado': float(stock_danado),
+            'stock_total': float(stock_bueno + stock_danado)
         }
