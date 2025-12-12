@@ -1424,86 +1424,151 @@ class ReporteStockAdmin(admin.ModelAdmin):
                 items_por_pagina = 100
         except (ValueError, TypeError):
             items_por_pagina = 100
-      
-# =========================================================
-        # ✅ OPTIMIZACIÓN CLAVE: Calcular Stock Masivo (1 consulta por almacén)
-        # =========================================================
+        
+        # Obtener stocks usando el nuevo sistema
         stocks = []
         productos_bajo_stock = []
         resumen_almacenes = []
-
-        total_stock_bueno_global = Decimal(0)
-        total_stock_danado_global = Decimal(0)
-
-        # Iterar sobre almacenes filtrados
-        for almacen in almacenes:
-            # 1. Obtener stock masivo para el almacén (1 consulta optimizada)
-            # Retorna un dict {producto_id: {stock_data}}
-            calc_bulk = views.get_stock_bulk(almacen.id) 
-            
-            total_almacen_bueno = Decimal(0)
-            total_almacen_danado = Decimal(0)
-            
-            # 2. Iterar sobre productos filtrados y usar el cálculo en memoria
-            for pid, producto in productos_info.items():
-                stock_data = calc_bulk.get(pid, None)
+        
+        # ⭐ CALCULAR ESTADÍSTICAS GLOBALES PRIMERO
+        total_productos_sistema = Producto.objects.filter(activo=True).count()
+        total_almacenes_activos = Almacen.objects.filter(activo=True).count()
+        
+        # Calcular stock total bueno y dañado
+        stock_bueno_total = 0
+        stock_danado_total = 0
+        productos_bajo_minimo_count = 0
+        
+        # Obtener almacenes
+        almacenes = Almacen.objects.filter(activo=True)
+        if almacen_id:
+            almacenes = almacenes.filter(id=almacen_id)
+        
+        # Obtener productos
+        productos = Producto.objects.filter(activo=True)
+        if categoria_id:
+            productos = productos.filter(categoria_id=categoria_id)
+        if producto_id:
+            productos = productos.filter(id=producto_id)
+        
+        # ⭐ CALCULAR STOCKS GLOBALES (sin filtros de vista)
+        for almacen_calc in Almacen.objects.filter(activo=True):
+            for producto_calc in Producto.objects.filter(activo=True):
+                stock_data = almacen_calc.get_stock_producto(producto_calc)
+                stock_bueno_total += stock_data['stock_bueno']
+                stock_danado_total += stock_data['stock_danado']
                 
-                # Inicializar a cero si no hay movimientos para este producto/almacén
-                if not stock_data:
-                    stock_bueno = Decimal(0)
-                    stock_danado = Decimal(0)
-                    stock_total = Decimal(0)
-                    # Datos de desglose
-                    d = {k: Decimal(0) for k in ['ent_b','ent_d','sal_b','sal_d','tras_rec_b','tras_rec_d','tras_env_b','tras_env_d']} 
-                else:
-                    stock_bueno = stock_data['stock_bueno']
-                    stock_danado = stock_data['stock_danado']
-                    stock_total = stock_data['stock_total']
-                    d = stock_data['data'] # Datos de desglose
+                # Verificar productos bajo mínimo
+                if hasattr(producto_calc, 'stock_minimo') and producto_calc.stock_minimo and producto_calc.stock_minimo > 0:
+                    if stock_data['stock_bueno'] <= producto_calc.stock_minimo:
+                        productos_bajo_minimo_count += 1
+        
+        if vista == 'detallado':
+            
+            # Vista detallada: calcular stock para cada almacén y producto
+            for almacen in almacenes:
+                for producto in productos:
+                    stock_data = almacen.get_stock_producto(producto)
                     
-                # Aplicar filtros (solo_con_stock, stock_minimo)
-                if solo_con_stock and stock_total == 0:
-                    continue
+                    # Aplicar filtros
+                    if solo_con_stock and stock_data['stock_total'] == 0:
+                        continue
+                    if stock_minimo and stock_data['stock_bueno'] > producto.stock_minimo:
+                        continue
                     
-                # Lógica de Stock Mínimo
-                if stock_minimo and producto.stock_minimo and stock_bueno < producto.stock_minimo:
+                    stocks.append({
+                        'almacen': almacen,
+                        'producto': producto,
+                        'stock_bueno': stock_data['stock_bueno'],
+                        'stock_danado': stock_data['stock_danado'],
+                        'stock_total': stock_data['stock_total'],
+                        'entradas_total': stock_data['entradas_total'],
+                        'salidas_total': stock_data['salidas_total'],
+                        'traslados_netos': stock_data['traslados_netos_total']
+                    })
+            
+        
+        elif vista == 'por_almacen':
+            for almacen in almacenes:
+                stocks_almacen = almacen.get_todos_los_stocks()
+                
+                total_productos = len(stocks_almacen)
+                stock_buena_total = sum(s['stock_bueno'] for s in stocks_almacen.values())
+                stock_danada_total = sum(s['stock_danado'] for s in stocks_almacen.values())
+                stock_total = stock_buena_total + stock_danada_total
+                
+                # ✅ Incluir stocks negativos
+                if total_productos > 0 or stock_total != 0 or not solo_con_stock:
+                    stocks.append({
+                        'almacen': almacen,
+                        'total_productos': total_productos,
+                        'stock_buena_total': stock_buena_total,
+                        'stock_danada_total': stock_danada_total,
+                        'stock_total': stock_total
+                    })
+                
+        else:  # por_producto
+            for producto in productos:
+                stock_buena_total = 0
+                stock_danada_total = 0
+                total_almacenes = 0
+                
+                for almacen in Almacen.objects.filter(activo=True):
+                    stock_data = almacen.get_stock_producto(producto)
+                    
+                    # ✅ Contar almacenes con stock != 0 (incluye negativos)
+                    if stock_data['stock_total'] != 0:
+                        stock_buena_total += stock_data['stock_bueno']
+                        stock_danada_total += stock_data['stock_danado']
+                        total_almacenes += 1
+                
+                stock_total_producto = stock_buena_total + stock_danada_total
+                if total_almacenes > 0 or stock_total_producto != 0 or not solo_con_stock:
+                    stocks.append({
+                        'producto': producto,
+                        'total_almacenes': total_almacenes,
+                        'stock_buena_total': stock_buena_total,
+                        'stock_danada_total': stock_danada_total,
+                        'stock_total': stock_total_producto
+                    })
+        
+        # Productos bajo stock mínimo
+        for almacen in Almacen.objects.filter(activo=True):
+            for producto in Producto.objects.filter(activo=True, stock_minimo__gt=0):
+                stock_data = almacen.get_stock_producto(producto)
+                if stock_data['stock_bueno'] <= producto.stock_minimo:
                     productos_bajo_stock.append({
                         'almacen': almacen,
                         'producto': producto,
-                        'stock_bueno': stock_bueno,
-                        'stock_danado': stock_danado,
-                        'stock_total': stock_total,
-                        'stock_minimo_val': producto.stock_minimo,
+                        'stock_actual': stock_data['stock_bueno'],
+                        'stock_minimo': producto.stock_minimo,
+                        'diferencia': producto.stock_minimo - stock_data['stock_bueno']
                     })
-
-                # Agregar a la lista principal de stocks (para la tabla paginada)
-                stocks.append({
-                    'almacen': almacen,
-                    'producto': producto,
-                    'stock_bueno': stock_bueno,
-                    'stock_danado': stock_danado,
-                    'stock_total': stock_total,
-                    # Desglose para vista detallada
-                    'entradas_total': d['ent_b'] + d['ent_d'],
-                    'salidas_total': d['sal_b'] + d['sal_d'],
-                    'traslados_recibidos_total': d['tras_rec_b'] + d['tras_rec_d'],
-                    'traslados_enviados_total': d['tras_env_b'] + d['tras_env_d'],
-                })
-                
-                total_almacen_bueno += stock_bueno
-                total_almacen_danado += stock_danado
+        
+        # Ordenar por diferencia
+        productos_bajo_stock = sorted(productos_bajo_stock, key=lambda x: x['diferencia'], reverse=True)[:10]
+        
+        # Resumen por almacén para sidebar
+        for almacen in Almacen.objects.filter(activo=True):
+            stocks_almacen = almacen.get_todos_los_stocks()
+            total_productos = len(stocks_almacen)
+            stock_total = sum(s['stock_total'] for s in stocks_almacen.values())
             
-            # Resumen por almacén
-            if total_almacen_bueno != Decimal(0) or total_almacen_danado != Decimal(0) or not solo_con_stock:
+            if total_productos > 0:
                 resumen_almacenes.append({
                     'almacen': almacen.nombre,
-                    'stock_bueno': float(total_almacen_bueno),
-                    'stock_danado': float(total_almacen_danado),
-                    'stock_total': float(total_almacen_bueno + total_almacen_danado)
+                    'total_productos': total_productos,
+                    'stock_total': stock_total
                 })
-                
-            total_stock_bueno_global += total_almacen_bueno
-            total_stock_danado_global += total_almacen_danado
+        
+        # Valoración total
+        total_items = stock_bueno_total + stock_danado_total
+        
+        valoracion = {
+            'total_productos': total_productos_sistema,
+            'total_items': total_items,
+            'valor_total': 0,  # Calcular si tienes precios
+        }
         
         # ⭐ AGREGAR ESTADÍSTICAS AL CONTEXTO
         estadisticas = {
