@@ -10,7 +10,7 @@ from recepcionistas.models import Recepcionista
 class Cliente(models.Model):
     codigo = models.CharField(max_length=50, unique=True, verbose_name=_("Código"))
     nombre = models.CharField(max_length=150, verbose_name=_("Nombre"))
-    direccion = models.TextField(blank=False, null=False, verbose_name=_("Dirección/Comunidad"))  # ← CAMBIO: blank=False, null=False
+    direccion = models.TextField(blank=False, null=False, verbose_name=_("Dirección/Comunidad"))
     telefono = models.CharField(max_length=20, blank=True, null=True, verbose_name=_("Teléfono"))
     observaciones = models.TextField(blank=True, null=True, verbose_name=_("Observaciones"))
     activo = models.BooleanField(default=True, verbose_name=_("Activo"))
@@ -19,6 +19,11 @@ class Cliente(models.Model):
         verbose_name = _("Cliente")
         verbose_name_plural = _("2.1. Clientes / Beneficiarios")
         ordering = ['codigo']
+        # Índices para búsquedas rápidas de clientes
+        indexes = [
+            models.Index(fields=['nombre']),
+            models.Index(fields=['activo']),
+        ]
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
@@ -129,9 +134,22 @@ class MovimientoCliente(models.Model):
         verbose_name = _("Movimiento de Cliente")
         verbose_name_plural = _("2.2 Movimientos de Cliente / Beneficiario")
         ordering = ['cliente__codigo', 'tipo', '-numero_movimiento']
+        # =========================================================
+        # 🚀 OPTIMIZACIÓN: ÍNDICES PARA REPORTES Y FILTROS RÁPIDOS
+        # =========================================================
+        indexes = [
+            models.Index(fields=['fecha']),
+            models.Index(fields=['tipo']),
+            models.Index(fields=['cliente']),
+            models.Index(fields=['cliente_origen']),
+            models.Index(fields=['cliente_destino']),
+            models.Index(fields=['almacen_origen']),
+            models.Index(fields=['almacen_destino']),
+            # Índice compuesto para filtrar por fecha y tipo simultáneamente (Dashboard)
+            models.Index(fields=['fecha', 'tipo']),
+        ]
 
     def __str__(self):
-        # IMPORTANTE: Si no hay número, mostrar un placeholder
         if self.numero_movimiento:
             return f"{self.numero_movimiento} - {self.tipo}"
         return f"Movimiento {self.tipo} (pendiente)"
@@ -157,7 +175,6 @@ class MovimientoCliente(models.Model):
                 raise ValidationError(
                     _("El cliente origen y destino no pueden ser el mismo")
                 )
-            # ✅ VALIDACIÓN: El cliente origen debe ser igual al cliente principal
             if self.cliente_origen != self.cliente:
                 raise ValidationError({
                     'cliente_origen': _("El cliente origen debe ser igual al cliente del reporte")
@@ -165,10 +182,7 @@ class MovimientoCliente(models.Model):
 
     def save(self, *args, **kwargs):
         """Genera el número de movimiento automáticamente SOLO si es nuevo"""
-        # CLAVE: Solo generar número si NO existe (es un registro nuevo)
-        # Si ya tiene pk, significa que es una edición y NO debe regenerarse
         if not self.pk and not self.numero_movimiento and self.cliente:
-            # Es un registro nuevo, generar número
             ultimo_movimiento = MovimientoCliente.objects.filter(
                 cliente=self.cliente,
                 tipo=self.tipo
@@ -176,7 +190,6 @@ class MovimientoCliente(models.Model):
             
             if ultimo_movimiento and ultimo_movimiento.numero_movimiento:
                 try:
-                    # Soporta ambos formatos: "/" y "-"
                     numero_limpio = ultimo_movimiento.numero_movimiento.replace('/', '-')
                     ultimo_numero = int(numero_limpio.split('-')[-1])
                     nuevo_numero = ultimo_numero + 1
@@ -191,31 +204,25 @@ class MovimientoCliente(models.Model):
                 'TRASLADO': 'TRA'
             }.get(self.tipo, 'MOV')
             
-            # ✅ FORMATO CORREGIDO: Usa "/" en lugar de "-"
-            # Formato: CODIGO_CLIENTE/PREFIJO-0001
             self.numero_movimiento = f"{self.cliente.codigo}/{prefijo}-{nuevo_numero:04d}"
         
         self.full_clean()
         super().save(*args, **kwargs)
 
     def get_total_productos(self):
-        """Retorna el total de productos diferentes en el movimiento"""
         return self.detalles.count()
 
     def get_total_cantidad_buena(self):
-        """Retorna la suma total de cantidades en buen estado"""
         return self.detalles.aggregate(
             total=models.Sum('cantidad')
         )['total'] or 0
 
     def get_total_cantidad_danada(self):
-        """Retorna la suma total de cantidades dañadas"""
         return self.detalles.aggregate(
             total=models.Sum('cantidad_danada')
         )['total'] or 0
 
     def get_total_cantidad_general(self):
-        """Retorna la suma total de todas las cantidades (buenas + dañadas)"""
         return self.get_total_cantidad_buena() + self.get_total_cantidad_danada()
 
 
@@ -254,12 +261,18 @@ class DetalleMovimientoCliente(models.Model):
         verbose_name_plural = _("2.3. Detalles de Movimientos")
         ordering = ['movimiento__cliente__codigo', 'movimiento__tipo', '-movimiento__numero_movimiento', 'id']
         unique_together = [['movimiento', 'producto']]
+        # =========================================================
+        # 🚀 OPTIMIZACIÓN: ÍNDICES PARA JOINs RÁPIDOS
+        # =========================================================
+        indexes = [
+            models.Index(fields=['producto']),
+            models.Index(fields=['movimiento']),
+        ]
 
     def __str__(self):
         return f"{self.producto.nombre} - Buena: {self.cantidad} / Dañada: {self.cantidad_danada}"
 
     def clean(self):
-        """Validación de cantidades"""
         if self.cantidad < 0:
             raise ValidationError({
                 'cantidad': _("La cantidad no puede ser negativa")
@@ -276,17 +289,14 @@ class DetalleMovimientoCliente(models.Model):
             )
 
     def get_cantidad_total(self):
-        """Retorna la suma de cantidad buena + dañada"""
         return self.cantidad + self.cantidad_danada
 
     def get_porcentaje_danado(self):
-        """Calcula el porcentaje de productos dañados"""
         total = self.get_cantidad_total()
         if total > 0:
             return (self.cantidad_danada / total) * 100
         return 0
 
     def save(self, *args, **kwargs):
-        """Override save para ejecutar validaciones"""
         self.full_clean()
         super().save(*args, **kwargs)

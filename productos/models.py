@@ -11,6 +11,10 @@ class Categoria(models.Model):
     class Meta:
         verbose_name = "Categoría"
         verbose_name_plural = "3.1. Categorías"
+        # 🚀 OPTIMIZACIÓN: Índice para búsquedas por nombre
+        indexes = [
+            models.Index(fields=['nombre']),
+        ]
 
 class UnidadMedida(models.Model):
     nombre = models.CharField(max_length=50, unique=True, verbose_name="* Nombre")
@@ -22,6 +26,10 @@ class UnidadMedida(models.Model):
     class Meta:
         verbose_name = "Unidad de Medida"
         verbose_name_plural = "3.2. Unidades de Medida"
+        # 🚀 OPTIMIZACIÓN: Índice para búsquedas por abreviatura
+        indexes = [
+            models.Index(fields=['abreviatura']),
+        ]
 
 class Producto(models.Model):
     TIPO_PRODUCTO = (
@@ -92,3 +100,13 @@ class Producto(models.Model):
         ordering = ['tipo','codigo']
         verbose_name = "Producto"
         verbose_name_plural = "3.3. Productos"
+        # =========================================================
+        # 🚀 OPTIMIZACIÓN: ÍNDICES PARA JOINs Y FILTROS EN REPORTES
+        # =========================================================
+        indexes = [
+            models.Index(fields=['tipo']),
+            models.Index(fields=['codigo']),
+            models.Index(fields=['categoria']),
+            models.Index(fields=['unidad_medida']),
+            models.Index(fields=['activo']),
+        ]
