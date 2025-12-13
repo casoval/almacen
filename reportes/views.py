@@ -825,12 +825,24 @@ def obtener_detalle_stock(request):
 def obtener_detalle_almacen(request):
     """
     Vista optimizada para listar todos los productos de un almacén con su stock.
+    Si no se especifica almacen_id, devuelve lista vacía (lazy loading).
     """
     almacen_id = request.GET.get('almacen_id')
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 50))
+    
+    # Si no hay almacen_id, devolver vacío (no error)
     if not almacen_id:
-        return JsonResponse({'success': False, 'error': 'Falta almacen_id'})
+        return JsonResponse({
+            'success': True,
+            'almacen': None,
+            'total_productos': 0,
+            'productos': [],
+            'page': page,
+            'limit': limit,
+            'total_pages': 0,
+            'message': 'Selecciona un almacén para ver el stock'
+        })
     
     try:
         almacen = Almacen.objects.get(id=almacen_id)
@@ -917,12 +929,25 @@ def obtener_detalle_producto_almacenes(request):
 def obtener_detalle_producto_almacenes(request):
     """
     Vista optimizada: Muestra el stock de un producto en TODOS los almacenes.
+    Si no se especifica producto_id, devuelve lista vacía (lazy loading).
     """
     producto_id = request.GET.get('producto_id')
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 50))
+    
+    # Si no hay producto_id, devolver vacío (no error)
     if not producto_id:
-        return JsonResponse({'success': False, 'error': 'Falta producto_id'})
+        return JsonResponse({
+            'success': True,
+            'producto': None,
+            'total_almacenes': 0,
+            'almacenes': [],
+            'page': page,
+            'limit': limit,
+            'total_pages': 0,
+            'totales': {'stock_bueno': '0', 'stock_danado': '0', 'stock_total': '0'},
+            'message': 'Selecciona un producto para ver su stock en almacenes'
+        })
     
     try:
         producto = Producto.objects.get(id=producto_id)
@@ -2591,10 +2616,19 @@ def obtener_detalle_almacen_real(request):
     """
     Vista AJAX SUPER OPTIMIZADA para stock de almacén.
     Evita el problema N+1 usando agregación masiva.
+    Si no se especifica almacen_id, devuelve lista vacía (lazy loading).
     """
     almacen_id = request.GET.get('almacen_id')
+    
+    # Si no hay almacen_id, devolver vacío (no error)
     if not almacen_id:
-        return JsonResponse({'success': False, 'error': 'Falta almacen_id'})
+        return JsonResponse({
+            'success': True,
+            'almacen': None,
+            'total_productos': 0,
+            'productos': [],
+            'message': 'Selecciona un almacén para ver el stock real'
+        })
     
     try:
         almacen = Almacen.objects.get(id=almacen_id)
@@ -2663,10 +2697,20 @@ def obtener_detalle_almacen_real(request):
 def obtener_detalle_producto_almacenes_real(request):
     """
     Vista AJAX optimizada: Muestra el stock de un producto en TODOS los almacenes.
+    Si no se especifica producto_id, devuelve lista vacía (lazy loading).
     """
     producto_id = request.GET.get('producto_id')
+    
+    # Si no hay producto_id, devolver vacío (no error)
     if not producto_id:
-        return JsonResponse({'success': False, 'error': 'Falta producto_id'})
+        return JsonResponse({
+            'success': True,
+            'producto': None,
+            'total_almacenes': 0,
+            'almacenes': [],
+            'totales': {'stock_bueno': '0', 'stock_danado': '0', 'stock_total': '0'},
+            'message': 'Selecciona un producto para ver su stock real en almacenes'
+        })
     
     try:
         producto = Producto.objects.get(id=producto_id)
