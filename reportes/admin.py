@@ -1464,6 +1464,7 @@ class ReporteStockAdmin(admin.ModelAdmin):
                         productos_bajo_minimo_count += 1
         
         if vista == 'detallado':
+            
             # Vista detallada: calcular stock para cada almacén y producto
             for almacen in almacenes:
                 for producto in productos:
