@@ -22,84 +22,74 @@ MAX_EXPORT_ROWS = 50000
 # ==============================================================================
 def get_stock_bulk(almacen_id, producto_id=None):
     """
-    Calcula el stock físico del almacén (Entradas - Salidas +/- Traslados).
-    Retorna un diccionario {producto_id: {datos}}.
+    Calcula el stock físico del almacén usando raw SQL para máxima velocidad.
     """
     cache_key = f'stock_bulk_{almacen_id}_{producto_id or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
     
-    # Filtramos movimientos donde el almacén sea origen o destino
-    qs = DetalleMovimientoAlmacen.objects.filter(
-        Q(movimiento__almacen_origen_id=almacen_id) | 
-        Q(movimiento__almacen_destino_id=almacen_id)
-    )
+    from django.db import connection
+    
+    # Raw SQL optimizado para PostgreSQL
+    sql = """
+    SELECT
+        d.producto_id,
+        SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+        ) AS stock_bueno,
+        SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) AS stock_danado
+    FROM almacenes_detallemovimientoalmacen d
+    JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s)
+    """
+    params = [almacen_id] * 10
     
     if producto_id:
-        qs = qs.filter(producto_id=producto_id)
-
-    # Agregación condicional masiva
-    stats = qs.values('producto_id').annotate(
-        # Entradas (Solo cuenta si el destino es este almacén)
-        ent_b=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        ent_d=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Salidas (Solo cuenta si el origen es este almacén)
-        sal_b=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        sal_d=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Traslados Recibidos (Destino = Este Almacén)
-        tras_rec_b=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_destino_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        tras_rec_d=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_destino_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Traslados Enviados (Origen = Este Almacén)
-        tras_env_b=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_origen_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        tras_env_d=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_origen_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-    )
-
-    # Procesar resultados en memoria
+        sql += " AND d.producto_id = %s"
+        params.append(producto_id)
+    
+    sql += " GROUP BY d.producto_id"
+    
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+    
     result = {}
-    for item in stats:
-        pid = item['producto_id']
-        
-        # Limpieza de Nones (convertir a Decimal(0))
-        d = {k: (v or Decimal(0)) for k, v in item.items() if k != 'producto_id'}
-        
-        # Cálculo de Totales
-        # Stock = Entradas - Salidas + Traslados Recibidos - Traslados Enviados
-        sb = d['ent_b'] - d['sal_b'] + d['tras_rec_b'] - d['tras_env_b']
-        sd = d['ent_d'] - d['sal_d'] + d['tras_rec_d'] - d['tras_env_d']
-        
+    for row in rows:
+        pid, sb, sd = row
+        sb = sb or Decimal(0)
+        sd = sd or Decimal(0)
         result[pid] = {
             'stock_bueno': sb,
             'stock_danado': sd,
             'stock_total': sb + sd,
-            'data': d # Guardamos el desglose para detalles
+            'data': {}  # Simplificado
         }
-        
-    cache.set(cache_key, result, 600)  # Cache 10 minutos
+    
+    cache.set(cache_key, result, 1800)
     return result
 
 # ==============================================================================
@@ -107,145 +97,138 @@ def get_stock_bulk(almacen_id, producto_id=None):
 # ==============================================================================
 def get_stock_real_bulk(almacen_id, producto_id=None):
     """
-    Realiza el cálculo de stock real en 2 consultas a base de datos en lugar de N*6.
-    Retorna un diccionario con key = producto_id y value = datos calculados.
+    Calcula el stock real del almacén usando raw SQL para máxima velocidad.
+    Incluye movimientos de almacén y cliente.
     """
     cache_key = f'stock_real_bulk_{almacen_id}_{producto_id or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
     
-    # 1. Movimientos de ALMACÉN (Entradas, Salidas, Traslados)
-    qs_alm = DetalleMovimientoAlmacen.objects.filter(
-        Q(movimiento__almacen_origen_id=almacen_id) | Q(movimiento__almacen_destino_id=almacen_id)
-    )
+    from django.db import connection
+    
+    # Raw SQL para movimientos de almacén
+    sql_alm = """
+    SELECT
+        d.producto_id,
+        SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+        ) AS stock_bueno_alm,
+        SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) - SUM(
+            CASE
+                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) AS stock_danado_alm
+    FROM almacenes_detallemovimientoalmacen d
+    JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s)
+    """
+    params_alm = [almacen_id] * 10
     
     if producto_id:
-        qs_alm = qs_alm.filter(producto_id=producto_id)
-
-    # Agregación condicional masiva
-    stats_alm = qs_alm.values('producto_id').annotate(
-        # Entradas (Destino = Este Almacén, Tipo = ENTRADA)
-        ent_alm_b=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        ent_alm_d=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Salidas (Origen = Este Almacén, Tipo = SALIDA)
-        sal_alm_b=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        sal_alm_d=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Traslados Recibidos (Destino = Este Almacén, Tipo = TRASLADO)
-        tras_rec_b=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_destino_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        tras_rec_d=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_destino_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Traslados Enviados (Origen = Este Almacén, Tipo = TRASLADO)
-        tras_env_b=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_origen_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        tras_env_d=Sum(Case(
-            When(movimiento__tipo='TRASLADO', movimiento__almacen_origen_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-    )
-
-    # 2. Movimientos de CLIENTE (Entradas y Salidas que afectan al almacén)
-    qs_cli = DetalleMovimientoCliente.objects.filter(
-        Q(movimiento__almacen_origen_id=almacen_id) | Q(movimiento__almacen_destino_id=almacen_id)
-    ).exclude(movimiento__tipo='TRASLADO') # Excluir traslados entre clientes
-
+        sql_alm += " AND d.producto_id = %s"
+        params_alm.append(producto_id)
+    
+    sql_alm += " GROUP BY d.producto_id"
+    
+    # Raw SQL para movimientos de cliente
+    sql_cli = """
+    SELECT
+        d.producto_id,
+        -SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+        ) AS stock_bueno_cli,
+        -SUM(
+            CASE
+                WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) + SUM(
+            CASE
+                WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+        ) AS stock_danado_cli
+    FROM beneficiarios_detallemovimientocliente d
+    JOIN beneficiarios_movimientocliente m ON d.movimiento_id = m.id
+    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s) AND m.tipo != 'TRASLADO'
+    """
+    params_cli = [almacen_id] * 6
+    
     if producto_id:
-        qs_cli = qs_cli.filter(producto_id=producto_id)
-
-    stats_cli = qs_cli.values('producto_id').annotate(
-        # Entradas Cliente (Salen del almacén hacia cliente -> RESTA Stock)
-        ent_cli_b=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        ent_cli_d=Sum(Case(
-            When(movimiento__tipo='ENTRADA', movimiento__almacen_origen_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-        # Salidas Cliente (Entran al almacén desde cliente -> SUMA Stock)
-        sal_cli_b=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad')),
-            default=0, output_field=DecimalField()
-        )),
-        sal_cli_d=Sum(Case(
-            When(movimiento__tipo='SALIDA', movimiento__almacen_destino_id=almacen_id, then=F('cantidad_danada')),
-            default=0, output_field=DecimalField()
-        )),
-    )
-
-    # 3. Procesar y Unificar en Python (Diccionario rápido)
+        sql_cli += " AND d.producto_id = %s"
+        params_cli.append(producto_id)
+    
+    sql_cli += " GROUP BY d.producto_id"
+    
+    with connection.cursor() as cursor:
+        cursor.execute(sql_alm, params_alm)
+        rows_alm = cursor.fetchall()
+        
+        cursor.execute(sql_cli, params_cli)
+        rows_cli = cursor.fetchall()
+    
+    # Combinar resultados
     stock_map = {}
-
-    # Procesar Almacén
-    for item in stats_alm:
-        pid = item['producto_id']
+    
+    # Procesar almacén
+    for row in rows_alm:
+        pid, sb_alm, sd_alm = row
+        sb_alm = sb_alm or Decimal(0)
+        sd_alm = sd_alm or Decimal(0)
         stock_map[pid] = {
-            'ent_alm_b': item['ent_alm_b'] or Decimal(0), 'ent_alm_d': item['ent_alm_d'] or Decimal(0),
-            'sal_alm_b': item['sal_alm_b'] or Decimal(0), 'sal_alm_d': item['sal_alm_d'] or Decimal(0),
-            'tras_rec_b': item['tras_rec_b'] or Decimal(0), 'tras_rec_d': item['tras_rec_d'] or Decimal(0),
-            'tras_env_b': item['tras_env_b'] or Decimal(0), 'tras_env_d': item['tras_env_d'] or Decimal(0),
-            'ent_cli_b': Decimal(0), 'ent_cli_d': Decimal(0),
-            'sal_cli_b': Decimal(0), 'sal_cli_d': Decimal(0),
+            'stock_bueno_alm': sb_alm,
+            'stock_danado_alm': sd_alm,
+            'stock_bueno_cli': Decimal(0),
+            'stock_danado_cli': Decimal(0),
         }
-
-    # Procesar Cliente
-    for item in stats_cli:
-        pid = item['producto_id']
+    
+    # Procesar cliente
+    for row in rows_cli:
+        pid, sb_cli, sd_cli = row
+        sb_cli = sb_cli or Decimal(0)
+        sd_cli = sd_cli or Decimal(0)
         if pid not in stock_map:
             stock_map[pid] = {
-                'ent_alm_b': Decimal(0), 'ent_alm_d': Decimal(0),
-                'sal_alm_b': Decimal(0), 'sal_alm_d': Decimal(0),
-                'tras_rec_b': Decimal(0), 'tras_rec_d': Decimal(0),
-                'tras_env_b': Decimal(0), 'tras_env_d': Decimal(0),
-                'ent_cli_b': Decimal(0), 'ent_cli_d': Decimal(0),
-                'sal_cli_b': Decimal(0), 'sal_cli_d': Decimal(0),
+                'stock_bueno_alm': Decimal(0),
+                'stock_danado_alm': Decimal(0),
+                'stock_bueno_cli': Decimal(0),
+                'stock_danado_cli': Decimal(0),
             }
-        stock_map[pid]['ent_cli_b'] = item['ent_cli_b'] or Decimal(0)
-        stock_map[pid]['ent_cli_d'] = item['ent_cli_d'] or Decimal(0)
-        stock_map[pid]['sal_cli_b'] = item['sal_cli_b'] or Decimal(0)
-        stock_map[pid]['sal_cli_d'] = item['sal_cli_d'] or Decimal(0)
-
-    # 4. Calcular Totales Finales
+        stock_map[pid]['stock_bueno_cli'] = sb_cli
+        stock_map[pid]['stock_danado_cli'] = sd_cli
+    
+    # Calcular totales
     result = {}
     for pid, vals in stock_map.items():
-        # FÓRMULA STOCK REAL:
-        # + Entradas Alm 
-        # - Salidas Alm 
-        # + Traslados Recibidos 
-        # - Traslados Enviados 
-        # - Entradas Cliente (Salen del almacén) 
-        # + Salidas Cliente (Entran al almacén)
-        
-        sb = (vals['ent_alm_b'] - vals['sal_alm_b'] + vals['tras_rec_b'] - vals['tras_env_b'] - vals['ent_cli_b'] + vals['sal_cli_b'])
-        sd = (vals['ent_alm_d'] - vals['sal_alm_d'] + vals['tras_rec_d'] - vals['tras_env_d'] - vals['ent_cli_d'] + vals['sal_cli_d'])
-        
+        sb = vals['stock_bueno_alm'] + vals['stock_bueno_cli']
+        sd = vals['stock_danado_alm'] + vals['stock_danado_cli']
         result[pid] = {
             'stock_bueno': sb,
             'stock_danado': sd,
             'stock_total': sb + sd,
-            'data': vals # Guardamos los parciales para detalle
+            'data': vals
         }
-        
-    cache.set(cache_key, result, 600)  # Cache 10 minutos
+    
+    cache.set(cache_key, result, 1800)
     return result
 
 
