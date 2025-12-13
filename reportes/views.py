@@ -3,6 +3,7 @@ import csv
 from datetime import datetime
 from decimal import Decimal
 from django.shortcuts import render
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.contrib.admin.views.decorators import staff_member_required
@@ -58,96 +59,162 @@ def get_stock_bulk(almacen_id, producto_id=None):
 def get_stock_real_bulk(almacen_id, producto_id=None):
     """
     Calcula el stock real del almacén usando StockCache + ajustes de cliente.
-    🚀 OPTIMIZACIÓN EXTREMA: Stock físico desde cache pre-calculado
+    🚀 OPTIMIZACIÓN EXTREMA: Todo desde cache pre-calculado
     """
+    cache_key = f'stock_real_cache_bulk_{almacen_id}_{producto_id or "all"}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
     from stock_cache.models import StockCache
     from django.db import connection
 
-    # Obtener stock físico desde cache pre-calculado
-    queryset = StockCache.objects.filter(almacen_id=almacen_id)
-    if producto_id:
-        queryset = queryset.filter(producto_id=producto_id)
+    # Calcular componentes detallados de almacén (con cache separado)
+    cache_key_alm = f'stock_real_alm_{almacen_id}_{producto_id or "all"}'
+    componentes_almacen = cache.get(cache_key_alm)
 
-    stock_fisico = {}
-    for stock_entry in queryset:
-        stock_fisico[stock_entry.producto_id] = {
-            'stock_bueno_alm': stock_entry.stock_bueno,
-            'stock_danado_alm': stock_entry.stock_danado,
-        }
+    if componentes_almacen is None:
+        sql_alm = """
+        SELECT
+            d.producto_id,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS ent_alm_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS ent_alm_d,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS sal_alm_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS sal_alm_d,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS tras_rec_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS tras_rec_d,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS tras_env_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS tras_env_d
+        FROM almacenes_detallemovimientoalmacen d
+        JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+        WHERE m.almacen_origen_id = %s OR m.almacen_destino_id = %s
+        """
+        params_alm = [almacen_id] * 10
 
-    # Calcular ajustes de movimientos de cliente (esto aún requiere cálculo)
-    sql_cli = """
-    SELECT
-        d.producto_id,
-        -SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
-        ) AS stock_bueno_cli,
-        -SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) AS stock_danado_cli
-    FROM beneficiarios_detallemovimientocliente d
-    JOIN beneficiarios_movimientocliente m ON d.movimiento_id = m.id
-    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s) AND m.tipo != 'TRASLADO'
-    """
-    params_cli = [almacen_id] * 6
+        if producto_id:
+            sql_alm += " AND d.producto_id = %s"
+            params_alm.append(producto_id)
 
-    if producto_id:
-        sql_cli += " AND d.producto_id = %s"
-        params_cli.append(producto_id)
+        sql_alm += " GROUP BY d.producto_id"
 
-    sql_cli += " GROUP BY d.producto_id"
+        with connection.cursor() as cursor:
+            cursor.execute(sql_alm, params_alm)
+            rows_alm = cursor.fetchall()
 
-    with connection.cursor() as cursor:
-        cursor.execute(sql_cli, params_cli)
-        rows_cli = cursor.fetchall()
+        componentes_almacen = {row[0]: {
+            'ent_alm_b': row[1], 'ent_alm_d': row[2],
+            'sal_alm_b': row[3], 'sal_alm_d': row[4],
+            'tras_rec_b': row[5], 'tras_rec_d': row[6],
+            'tras_env_b': row[7], 'tras_env_d': row[8]
+        } for row in rows_alm}
+        cache.set(cache_key_alm, componentes_almacen, 3600)  # Cache 1 hora
 
-    # Combinar resultados
-    stock_map = {}
+    # Calcular ajustes de movimientos de cliente (con cache separado)
+    cache_key_cli = f'stock_real_cli_{almacen_id}_{producto_id or "all"}'
+    ajustes_cliente = cache.get(cache_key_cli)
 
-    # Inicializar con stock físico
-    for pid, vals in stock_fisico.items():
-        stock_map[pid] = {
-            'stock_bueno_alm': vals['stock_bueno_alm'],
-            'stock_danado_alm': vals['stock_danado_alm'],
-            'stock_bueno_cli': Decimal(0),
-            'stock_danado_cli': Decimal(0),
-        }
+    if ajustes_cliente is None:
+        sql_cli = """
+        SELECT
+            d.producto_id,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS ent_cli_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'ENTRADA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS ent_cli_d,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
+            ), 0) AS sal_cli_b,
+            COALESCE(SUM(
+                CASE
+                    WHEN m.tipo = 'SALIDA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
+            ), 0) AS sal_cli_d
+        FROM beneficiarios_detallemovimientocliente d
+        JOIN beneficiarios_movimientocliente m ON d.movimiento_id = m.id
+        WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s) AND m.tipo != 'TRASLADO'
+        """
+        params_cli = [almacen_id] * 6
 
-    # Agregar ajustes de cliente
-    for row in rows_cli:
-        pid, sb_cli, sd_cli = row
-        sb_cli = sb_cli or Decimal(0)
-        sd_cli = sd_cli or Decimal(0)
-        if pid not in stock_map:
-            stock_map[pid] = {
-                'stock_bueno_alm': Decimal(0),
-                'stock_danado_alm': Decimal(0),
-                'stock_bueno_cli': Decimal(0),
-                'stock_danado_cli': Decimal(0),
-            }
-        stock_map[pid]['stock_bueno_cli'] = sb_cli
-        stock_map[pid]['stock_danado_cli'] = sd_cli
+        if producto_id:
+            sql_cli += " AND d.producto_id = %s"
+            params_cli.append(producto_id)
 
-    # Calcular totales
+        sql_cli += " GROUP BY d.producto_id"
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql_cli, params_cli)
+            rows_cli = cursor.fetchall()
+
+        ajustes_cliente = {row[0]: {
+            'ent_cli_b': row[1], 'ent_cli_d': row[2],
+            'sal_cli_b': row[3], 'sal_cli_d': row[4]
+        } for row in rows_cli}
+        cache.set(cache_key_cli, ajustes_cliente, 3600)  # Cache 1 hora
+
+    # Combinar resultados de forma eficiente
     result = {}
-    for pid, vals in stock_map.items():
-        sb = vals['stock_bueno_alm'] + vals['stock_bueno_cli']
-        sd = vals['stock_danado_alm'] + vals['stock_danado_cli']
+
+    # Procesar todos los productos que tienen componentes
+    all_productos = set(componentes_almacen.keys()) | set(ajustes_cliente.keys())
+    
+    for pid in all_productos:
+        vals_alm = componentes_almacen.get(pid, {
+            'ent_alm_b': Decimal(0), 'ent_alm_d': Decimal(0),
+            'sal_alm_b': Decimal(0), 'sal_alm_d': Decimal(0),
+            'tras_rec_b': Decimal(0), 'tras_rec_d': Decimal(0),
+            'tras_env_b': Decimal(0), 'tras_env_d': Decimal(0)
+        })
+        vals_cli = ajustes_cliente.get(pid, {
+            'ent_cli_b': Decimal(0), 'ent_cli_d': Decimal(0),
+            'sal_cli_b': Decimal(0), 'sal_cli_d': Decimal(0)
+        })
+
+        # Calcular stock total desde componentes
+        stock_bueno = (vals_alm['ent_alm_b'] + vals_alm['tras_rec_b'] + vals_cli['ent_cli_b'] - 
+                      vals_alm['sal_alm_b'] - vals_alm['tras_env_b'] - vals_cli['sal_cli_b'])
+        stock_danado = (vals_alm['ent_alm_d'] + vals_alm['tras_rec_d'] + vals_cli['ent_cli_d'] - 
+                       vals_alm['sal_alm_d'] - vals_alm['tras_env_d'] - vals_cli['sal_cli_d'])
+
         result[pid] = {
-            'stock_bueno': sb,
-            'stock_danado': sd,
-            'stock_total': sb + sd,
-            'data': vals
+            'stock_bueno': stock_bueno,
+            'stock_danado': stock_danado,
+            'stock_total': stock_bueno + stock_danado,
+            'data': {
+                **vals_alm,
+                **vals_cli
+            }
         }
 
+    # Cache del resultado final
+    cache.set(cache_key, result, 3600)
     return result
 
 
