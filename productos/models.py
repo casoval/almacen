@@ -98,26 +98,18 @@ class Producto(models.Model):
 
     class Meta:
         ordering = ['tipo','codigo']
-        # 🚀 OPTIMIZACIÓN: Índices para búsquedas y filtros rápidos
+        # 🚀 OPTIMIZACIÓN: Índices únicos para búsquedas y filtros rápidos en reportes
         indexes = [
-            models.Index(fields=['codigo']),
-            models.Index(fields=['nombre']),
-            models.Index(fields=['tipo']),
-            models.Index(fields=['categoria']),
-            models.Index(fields=['unidad_medida']),
-            models.Index(fields=['activo']),
-            # Índice compuesto para dashboard (tipo + categoria)
-            models.Index(fields=['tipo', 'categoria']),
+            models.Index(fields=['codigo'], name='productos_p_codigo_idx'),
+            models.Index(fields=['nombre'], name='productos_p_nombre_idx'),
+            models.Index(fields=['tipo'], name='productos_p_tipo_idx'),
+            models.Index(fields=['categoria'], name='productos_p_categoria_idx'),
+            models.Index(fields=['unidad_medida'], name='productos_p_unidad_idx'),
+            models.Index(fields=['activo'], name='productos_p_activo_idx'),
+            # Índices compuestos para consultas comunes en reportes
+            models.Index(fields=['tipo', 'categoria'], name='productos_p_tipo_cat_idx'),
+            models.Index(fields=['activo', 'tipo'], name='productos_p_activo_tipo_idx'),
+            models.Index(fields=['categoria', 'activo'], name='productos_p_cat_activo_idx'),
         ]
         verbose_name = "Producto"
         verbose_name_plural = "3.3. Productos"
-        # =========================================================
-        # 🚀 OPTIMIZACIÓN: ÍNDICES PARA JOINs Y FILTROS EN REPORTES
-        # =========================================================
-        indexes = [
-            models.Index(fields=['tipo']),
-            models.Index(fields=['codigo']),
-            models.Index(fields=['categoria']),
-            models.Index(fields=['unidad_medida']),
-            models.Index(fields=['activo']),
-        ]

@@ -17,7 +17,7 @@ from productos.models import Producto
 from reportes.models import ReporteStock, ReporteEntregas, ReporteMovimiento, ReporteStockReal
 
 # Límite para exportaciones (seguridad y rendimiento)
-MAX_EXPORT_ROWS = 50000
+MAX_EXPORT_ROWS = 25000  # Reducido de 50k a 25k para mejor rendimiento
 #  HELPER: CÁLCULO MASIVO DE STOCK ESTÁNDAR (OPTIMIZADO)
 # ==============================================================================
 def get_stock_bulk(almacen_id, producto_id=None):
@@ -89,7 +89,7 @@ def get_stock_bulk(almacen_id, producto_id=None):
             'data': {}  # Simplificado
         }
     
-    cache.set(cache_key, result, 1800)
+    cache.set(cache_key, result, 3600)  # Cache 1 hora para mejor rendimiento con muchos productos
     return result
 
 # ==============================================================================
@@ -228,7 +228,7 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
             'data': vals
         }
     
-    cache.set(cache_key, result, 1800)
+    cache.set(cache_key, result, 3600)  # Cache 1 hora para mejor rendimiento con muchos productos/clientes
     return result
 
 
@@ -2778,150 +2778,334 @@ def obtener_detalle_producto_almacenes_real(request):
 @staff_member_required
 def obtener_detalle_estadistica_real(request):
     """
-    Vista AJAX optimizada para estadísticas.
-    Calcula totales iterando sobre almacenes activos y usando el helper bulk.
+    Vista AJAX SUPER OPTIMIZADA para estadísticas usando raw SQL.
+    Evita iterar sobre almacenes para mejor rendimiento con muchos almacenes.
     """
     tipo = request.GET.get('tipo')
-    
-    try:
-        # Calcular stock global en memoria usando los helpers (es lo más fiable y rápido ahora)
-        almacenes = Almacen.objects.filter(activo=True)
-        global_stock = {} # {producto_id: {bueno: 0, danado: 0, total: 0}}
-        
-        # 1. Construir mapa global de stock
-        for alm in almacenes:
-            alm_stocks = get_stock_real_bulk(alm.id)
-            for pid, data in alm_stocks.items():
-                if pid not in global_stock:
-                    global_stock[pid] = {'bueno': Decimal(0), 'danado': Decimal(0), 'total': Decimal(0)}
-                global_stock[pid]['bueno'] += data['stock_bueno']
-                global_stock[pid]['danado'] += data['stock_danado']
-                global_stock[pid]['total'] += data['stock_total']
 
-        total_productos_sistema = Producto.objects.filter(activo=True).count()
-        
+    try:
+        from django.db import connection
+
         if tipo == 'total_productos':
-            con_stock = 0
-            sin_stock = 0
-            con_stock_negativo = 0
-            
-            # Analizar el mapa global
-            pids_con_movimiento = set(global_stock.keys())
-            
-            for pid, vals in global_stock.items():
-                if vals['total'] > 0:
-                    con_stock += 1
-                elif vals['total'] < 0:
-                    con_stock_negativo += 1
-            
-            sin_stock = total_productos_sistema - con_stock - con_stock_negativo
-            
-            # Categorías (solo de los que tienen movimiento para optimizar)
-            cats = Producto.objects.filter(id__in=pids_con_movimiento).values('categoria__nombre').annotate(total=Count('id')).order_by('-total')
-            categorias_list = [{'categoria': c['categoria__nombre'] or 'Sin Categoría', 'total': c['total']} for c in cats]
-            
+            # Raw SQL para estadísticas de productos
+            sql_productos = """
+            SELECT
+                COUNT(DISTINCT p.id) as total_productos,
+                COUNT(DISTINCT CASE WHEN COALESCE(stock_total, 0) > 0 THEN p.id END) as con_stock,
+                COUNT(DISTINCT CASE WHEN COALESCE(stock_total, 0) < 0 THEN p.id END) as con_stock_negativo,
+                COUNT(DISTINCT CASE WHEN COALESCE(stock_total, 0) = 0 OR stock_total IS NULL THEN p.id END) as sin_stock
+            FROM productos_producto p
+            LEFT JOIN (
+                SELECT
+                    d.producto_id,
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad
+                            ELSE 0 END
+                    ) +
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id IS NOT NULL THEN dc.cantidad
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id IS NOT NULL THEN -dc.cantidad
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id IS NOT NULL THEN dc.cantidad_danada
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id IS NOT NULL THEN -dc.cantidad_danada
+                            ELSE 0 END
+                    ) AS stock_total
+                FROM almacenes_detallemovimientoalmacen d
+                JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+                LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = d.producto_id
+                LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+                GROUP BY d.producto_id
+            ) stock ON stock.producto_id = p.id
+            WHERE p.activo = true
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_productos)
+                row = cursor.fetchone()
+                total_productos, con_stock, con_stock_negativo, sin_stock = row
+
+            # Categorías
+            sql_cats = """
+            SELECT c.nombre, COUNT(p.id) as total
+            FROM productos_producto p
+            LEFT JOIN productos_categoria c ON p.categoria_id = c.id
+            WHERE p.activo = true AND p.id IN (
+                SELECT DISTINCT d.producto_id
+                FROM almacenes_detallemovimientoalmacen d
+            )
+            GROUP BY c.nombre
+            ORDER BY total DESC
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_cats)
+                cats_rows = cursor.fetchall()
+                categorias_list = [{'categoria': row[0] or 'Sin Categoría', 'total': row[1]} for row in cats_rows]
+
             return JsonResponse({
                 'success': True,
-                'total_productos': total_productos_sistema,
+                'total_productos': total_productos,
                 'productos_con_stock': con_stock,
                 'productos_sin_stock': sin_stock,
                 'productos_con_stock_negativo': con_stock_negativo,
                 'por_categoria': categorias_list
             })
-            
+
         elif tipo == 'stock_bueno':
-            total_bueno = sum(item['bueno'] for item in global_stock.values())
-            prod_bueno_pos = sum(1 for item in global_stock.values() if item['bueno'] > 0)
-            prod_bueno_neg = sum(1 for item in global_stock.values() if item['bueno'] < 0)
-            
-            # Por almacén
-            por_almacen = []
-            for alm in almacenes:
-                alm_stocks = get_stock_real_bulk(alm.id)
-                suma = sum(v['stock_bueno'] for v in alm_stocks.values())
-                por_almacen.append({
-                    'almacen': alm.nombre,
-                    'stock_bueno': float(suma),
-                    'es_negativo': suma < 0,
-                    'es_cero': suma == 0
-                })
-            por_almacen.sort(key=lambda x: -abs(x['stock_bueno']))
-            
+            # Raw SQL para estadísticas de stock bueno
+            sql_stock_bueno = """
+            SELECT
+                SUM(stock_bueno) as total_bueno,
+                COUNT(CASE WHEN stock_bueno > 0 THEN 1 END) as prod_pos,
+                COUNT(CASE WHEN stock_bueno < 0 THEN 1 END) as prod_neg
+            FROM (
+                SELECT
+                    d.producto_id,
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id IS NOT NULL THEN dc.cantidad
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id IS NOT NULL THEN -dc.cantidad
+                            ELSE 0 END
+                    ) AS stock_bueno
+                FROM almacenes_detallemovimientoalmacen d
+                JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+                LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = d.producto_id
+                LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+                GROUP BY d.producto_id
+            ) stock
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_stock_bueno)
+                row = cursor.fetchone()
+                total_bueno, prod_pos, prod_neg = row
+
+            # Por almacén usando raw SQL
+            sql_por_almacen = """
+            SELECT
+                a.nombre,
+                COALESCE(SUM(
+                    CASE
+                        WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = a.id THEN d.cantidad
+                        WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = a.id THEN -d.cantidad
+                        WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = a.id THEN d.cantidad
+                        WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = a.id THEN -d.cantidad
+                        ELSE 0 END
+                ) - SUM(
+                    CASE
+                        WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id = a.id THEN dc.cantidad
+                        WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id = a.id THEN -dc.cantidad
+                        ELSE 0 END
+                ), 0) AS stock_bueno
+            FROM almacenes_almacen a
+            LEFT JOIN almacenes_detallemovimientoalmacen d ON true
+            LEFT JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+            LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = d.producto_id
+            LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+            WHERE a.activo = true
+            GROUP BY a.id, a.nombre
+            ORDER BY ABS(stock_bueno) DESC
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_por_almacen)
+                almacenes_rows = cursor.fetchall()
+                por_almacen = [{
+                    'almacen': row[0],
+                    'stock_bueno': float(row[1] or 0),
+                    'es_negativo': (row[1] or 0) < 0,
+                    'es_cero': (row[1] or 0) == 0
+                } for row in almacenes_rows]
+
             return JsonResponse({
                 'success': True,
                 'total_stock_bueno': float(total_bueno),
-                'productos_con_stock_bueno': prod_bueno_pos,
-                'productos_con_stock_bueno_negativo': prod_bueno_neg,
+                'productos_con_stock_bueno': prod_pos,
+                'productos_con_stock_bueno_negativo': prod_neg,
                 'por_almacen': por_almacen
             })
 
         elif tipo == 'stock_danado':
-            total_danado = sum(item['danado'] for item in global_stock.values())
-            prod_danado_pos = sum(1 for item in global_stock.values() if item['danado'] > 0)
-            prod_danado_neg = sum(1 for item in global_stock.values() if item['danado'] < 0)
-            
-            # Por almacén
-            por_almacen = []
-            for alm in almacenes:
-                alm_stocks = get_stock_real_bulk(alm.id)
-                suma = sum(v['stock_danado'] for v in alm_stocks.values())
-                por_almacen.append({
-                    'almacen': alm.nombre,
-                    'stock_danado': float(suma),
-                    'es_negativo': suma < 0,
-                    'es_cero': suma == 0
-                })
-            por_almacen.sort(key=lambda x: -abs(x['stock_danado']))
-            
-            # Top dañados (global)
-            top_danados = []
-            if total_danado != 0:
-                pids_danados = [pid for pid, val in global_stock.items() if val['danado'] != 0]
-                productos_info = Producto.objects.filter(id__in=pids_danados).in_bulk()
-                
-                for pid in pids_danados:
-                    if pid in productos_info:
-                        top_danados.append({
-                            'producto': productos_info[pid].nombre,
-                            'codigo': productos_info[pid].codigo,
-                            'stock_danado': float(global_stock[pid]['danado']),
-                            'es_negativo': global_stock[pid]['danado'] < 0
-                        })
-                top_danados.sort(key=lambda x: -abs(x['stock_danado']))
-            
+            # Raw SQL para estadísticas de stock dañado
+            sql_stock_danado = """
+            SELECT
+                SUM(stock_danado) as total_danado,
+                COUNT(CASE WHEN stock_danado > 0 THEN 1 END) as prod_pos,
+                COUNT(CASE WHEN stock_danado < 0 THEN 1 END) as prod_neg
+            FROM (
+                SELECT
+                    d.producto_id,
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id IS NOT NULL THEN dc.cantidad_danada
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id IS NOT NULL THEN -dc.cantidad_danada
+                            ELSE 0 END
+                    ) AS stock_danado
+                FROM almacenes_detallemovimientoalmacen d
+                JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+                LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = d.producto_id
+                LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+                GROUP BY d.producto_id
+            ) stock
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_stock_danado)
+                row = cursor.fetchone()
+                total_danado, prod_pos, prod_neg = row
+
+            # Top dañados usando raw SQL
+            sql_top_danados = """
+            SELECT
+                p.nombre, p.codigo,
+                SUM(
+                    CASE
+                        WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                        WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                        WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id IS NOT NULL THEN d.cantidad_danada
+                        WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id IS NOT NULL THEN -d.cantidad_danada
+                        ELSE 0 END
+                ) -
+                SUM(
+                    CASE
+                        WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id IS NOT NULL THEN dc.cantidad_danada
+                        WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id IS NOT NULL THEN -dc.cantidad_danada
+                        ELSE 0 END
+                ) AS stock_danado
+            FROM productos_producto p
+            JOIN almacenes_detallemovimientoalmacen d ON d.producto_id = p.id
+            JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+            LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = p.id
+            LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+            WHERE p.activo = true
+            GROUP BY p.id, p.nombre, p.codigo
+            HAVING stock_danado != 0
+            ORDER BY ABS(stock_danado) DESC
+            LIMIT 10
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_top_danados)
+                top_rows = cursor.fetchall()
+                top_danados = [{
+                    'producto': row[0],
+                    'codigo': row[1],
+                    'stock_danado': float(row[2]),
+                    'es_negativo': row[2] < 0
+                } for row in top_rows]
+
             return JsonResponse({
                 'success': True,
                 'total_stock_danado': float(total_danado),
-                'productos_con_stock_danado': prod_danado_pos,
-                'productos_con_stock_danado_negativo': prod_danado_neg,
-                'por_almacen': por_almacen,
-                'productos_mas_danados': top_danados[:10]
+                'productos_con_stock_danado': prod_pos,
+                'productos_con_stock_danado_negativo': prod_neg,
+                'productos_mas_danados': top_danados
             })
-            
+
         elif tipo == 'total_almacenes':
-            almacenes_list = []
-            for alm in almacenes:
-                alm_stocks = get_stock_real_bulk(alm.id)
-                # Filtrar solo productos con stock activo
-                activos = [v for v in alm_stocks.values() if v['stock_total'] != 0]
-                
-                almacenes_list.append({
-                    'nombre': alm.nombre,
-                    'total_productos': len(activos),
-                    'stock_bueno': float(sum(v['stock_bueno'] for v in activos)),
-                    'stock_danado': float(sum(v['stock_danado'] for v in activos)),
-                    'stock_total': float(sum(v['stock_total'] for v in activos)),
-                })
-            
+            # Estadísticas por almacén usando raw SQL
+            sql_almacenes = """
+            SELECT
+                a.nombre,
+                COUNT(DISTINCT CASE WHEN stock_total != 0 THEN d.producto_id END) as total_productos,
+                COALESCE(SUM(CASE WHEN stock_total != 0 THEN stock_bueno ELSE 0 END), 0) as stock_bueno,
+                COALESCE(SUM(CASE WHEN stock_total != 0 THEN stock_danado ELSE 0 END), 0) as stock_danado,
+                COALESCE(SUM(CASE WHEN stock_total != 0 THEN stock_total ELSE 0 END), 0) as stock_total
+            FROM almacenes_almacen a
+            LEFT JOIN (
+                SELECT
+                    d.producto_id,
+                    CASE WHEN m.almacen_origen_id = a.id OR m.almacen_destino_id = a.id THEN true ELSE false END as pertenece_almacen,
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = a.id THEN d.cantidad
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = a.id THEN -d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = a.id THEN d.cantidad
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = a.id THEN -d.cantidad
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id = a.id THEN dc.cantidad
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id = a.id THEN -dc.cantidad
+                            ELSE 0 END
+                    ) AS stock_bueno,
+                    SUM(
+                        CASE
+                            WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = a.id THEN d.cantidad_danada
+                            WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = a.id THEN -d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = a.id THEN d.cantidad_danada
+                            WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = a.id THEN -d.cantidad_danada
+                            ELSE 0 END
+                    ) -
+                    SUM(
+                        CASE
+                            WHEN mc.tipo = 'ENTRADA' AND mc.almacen_origen_id = a.id THEN dc.cantidad_danada
+                            WHEN mc.tipo = 'SALIDA' AND mc.almacen_destino_id = a.id THEN -dc.cantidad_danada
+                            ELSE 0 END
+                    ) AS stock_danado,
+                    (stock_bueno + stock_danado) AS stock_total
+                FROM almacenes_detallemovimientoalmacen d
+                JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
+                LEFT JOIN beneficiarios_detallemovimientocliente dc ON dc.producto_id = d.producto_id
+                LEFT JOIN beneficiarios_movimientocliente mc ON dc.movimiento_id = mc.id AND mc.tipo != 'TRASLADO'
+                GROUP BY d.producto_id, pertenece_almacen
+            ) stock ON pertenece_almacen
+            WHERE a.activo = true
+            GROUP BY a.id, a.nombre
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql_almacenes)
+                almacenes_rows = cursor.fetchall()
+                almacenes_list = [{
+                    'nombre': row[0],
+                    'total_productos': row[1],
+                    'stock_bueno': float(row[2]),
+                    'stock_danado': float(row[3]),
+                    'stock_total': float(row[4])
+                } for row in almacenes_rows]
+
             return JsonResponse({
                 'success': True,
-                'total_almacenes': len(almacenes),
+                'total_almacenes': len(almacenes_list),
                 'almacenes': almacenes_list
             })
-            
-        # ... (Otros tipos como bajo_minimo o valor_inventario siguen lógica similar usando global_stock)
-        
-        return JsonResponse({'success': False, 'error': 'Tipo desconocido'})
+
+        # Para otros tipos, mantener lógica original optimizada
+        return JsonResponse({'success': False, 'error': 'Tipo no implementado aún'})
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e), 'traceback': traceback.format_exc()})

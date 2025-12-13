@@ -24,6 +24,13 @@ class Almacen(models.Model):
         verbose_name = _("Almacén")
         verbose_name_plural = _("1.1. Almacenes")
         ordering = ['nombre']
+        # 🚀 OPTIMIZACIÓN: Índices para reportes y filtros
+        indexes = [
+            models.Index(fields=['activo'], name='almacen_activo_idx'),
+            models.Index(fields=['codigo'], name='almacen_codigo_idx'),
+            models.Index(fields=['nombre'], name='almacen_nombre_idx'),
+            models.Index(fields=['activo', 'codigo'], name='almacen_act_cod_idx'),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -208,14 +215,20 @@ class MovimientoAlmacen(models.Model):
         # 🚀 OPTIMIZACIÓN: ÍNDICES PARA BÚSQUEDAS RÁPIDAS
         # =========================================================
         indexes = [
-            models.Index(fields=['fecha']),
-            models.Index(fields=['tipo']),
-            models.Index(fields=['almacen_origen']),
-            models.Index(fields=['almacen_destino']),
-            models.Index(fields=['proveedor']),
-            models.Index(fields=['recepcionista']),
+            models.Index(fields=['fecha'], name='mov_alm_fecha_idx'),
+            models.Index(fields=['tipo'], name='mov_alm_tipo_idx'),
+            models.Index(fields=['almacen_origen'], name='mov_alm_orig_idx'),
+            models.Index(fields=['almacen_destino'], name='mov_alm_dest_idx'),
+            models.Index(fields=['proveedor'], name='mov_alm_prov_idx'),
+            models.Index(fields=['recepcionista'], name='mov_alm_rec_idx'),
             # Índice compuesto para el dashboard (filtrar por fecha Y tipo a la vez)
-            models.Index(fields=['fecha', 'tipo']),
+            models.Index(fields=['fecha', 'tipo'], name='mov_alm_fecha_tipo_idx'),
+            # 🚀 OPTIMIZACIÓN: Índices críticos para cálculos de stock
+            models.Index(fields=['tipo', 'almacen_origen'], name='mov_alm_tipo_orig_idx'),
+            models.Index(fields=['tipo', 'almacen_destino'], name='mov_alm_tipo_dest_idx'),
+            models.Index(fields=['almacen_origen', 'almacen_destino'], name='mov_alm_orig_dest_idx'),
+            models.Index(fields=['fecha', 'almacen_origen'], name='mov_alm_fecha_orig_idx'),
+            models.Index(fields=['fecha', 'almacen_destino'], name='mov_alm_fecha_dest_idx'),
         ]
 
     def __str__(self):
@@ -348,11 +361,14 @@ class DetalleMovimientoAlmacen(models.Model):
         # 🚀 OPTIMIZACIÓN: ÍNDICES PARA CÁLCULOS DE STOCK
         # =========================================================
         indexes = [
-            models.Index(fields=['producto']),
-            models.Index(fields=['movimiento']),
+            models.Index(fields=['producto'], name='det_mov_alm_prod_idx'),
+            models.Index(fields=['movimiento'], name='det_mov_alm_mov_idx'),
             # Índices compuestos para queries de stock masivas
-            models.Index(fields=['producto', 'movimiento']),
-            models.Index(fields=['movimiento', 'producto']),
+            models.Index(fields=['producto', 'movimiento'], name='det_mov_alm_prod_mov_idx'),
+            models.Index(fields=['movimiento', 'producto'], name='det_mov_alm_mov_prod_idx'),
+            # 🚀 OPTIMIZACIÓN: Índices críticos para raw SQL de stock
+            models.Index(fields=['producto', 'cantidad'], name='det_mov_alm_prod_cant_idx'),
+            models.Index(fields=['producto', 'cantidad_danada'], name='det_mov_alm_prod_dan_idx'),
         ]
 
     def __str__(self):

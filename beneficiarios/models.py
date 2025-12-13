@@ -138,15 +138,21 @@ class MovimientoCliente(models.Model):
         # 🚀 OPTIMIZACIÓN: ÍNDICES PARA REPORTES Y FILTROS RÁPIDOS
         # =========================================================
         indexes = [
-            models.Index(fields=['fecha']),
-            models.Index(fields=['tipo']),
-            models.Index(fields=['cliente']),
-            models.Index(fields=['cliente_origen']),
-            models.Index(fields=['cliente_destino']),
-            models.Index(fields=['almacen_origen']),
-            models.Index(fields=['almacen_destino']),
+            models.Index(fields=['fecha'], name='mov_cli_fecha_idx'),
+            models.Index(fields=['tipo'], name='mov_cli_tipo_idx'),
+            models.Index(fields=['cliente'], name='mov_cli_cliente_idx'),
+            models.Index(fields=['cliente_origen'], name='mov_cli_orig_idx'),
+            models.Index(fields=['cliente_destino'], name='mov_cli_dest_idx'),
+            models.Index(fields=['almacen_origen'], name='mov_cli_alm_orig_idx'),
+            models.Index(fields=['almacen_destino'], name='mov_cli_alm_dest_idx'),
             # Índice compuesto para filtrar por fecha y tipo simultáneamente (Dashboard)
-            models.Index(fields=['fecha', 'tipo']),
+            models.Index(fields=['fecha', 'tipo'], name='mov_cli_fecha_tipo_idx'),
+            # 🚀 OPTIMIZACIÓN: Índices críticos para cálculos de stock real
+            models.Index(fields=['tipo', 'almacen_origen'], name='mov_cli_tipo_alm_orig_idx'),
+            models.Index(fields=['tipo', 'almacen_destino'], name='mov_cli_tipo_alm_dest_idx'),
+            models.Index(fields=['almacen_origen', 'almacen_destino'], name='mov_cli_alm_orig_dest_idx'),
+            models.Index(fields=['fecha', 'almacen_origen'], name='mov_cli_fecha_alm_orig_idx'),
+            models.Index(fields=['fecha', 'almacen_destino'], name='mov_cli_fecha_alm_dest_idx'),
         ]
 
     def __str__(self):
@@ -265,8 +271,13 @@ class DetalleMovimientoCliente(models.Model):
         # 🚀 OPTIMIZACIÓN: ÍNDICES PARA JOINs RÁPIDOS
         # =========================================================
         indexes = [
-            models.Index(fields=['producto']),
-            models.Index(fields=['movimiento']),
+            models.Index(fields=['producto'], name='det_mov_cli_prod_idx'),
+            models.Index(fields=['movimiento'], name='det_mov_cli_mov_idx'),
+            # 🚀 OPTIMIZACIÓN: Índices críticos para raw SQL de stock real
+            models.Index(fields=['producto', 'movimiento'], name='det_mov_cli_prod_mov_idx'),
+            models.Index(fields=['movimiento', 'producto'], name='det_mov_cli_mov_prod_idx'),
+            models.Index(fields=['producto', 'cantidad'], name='det_mov_cli_prod_cant_idx'),
+            models.Index(fields=['producto', 'cantidad_danada'], name='det_mov_cli_prod_dan_idx'),
         ]
 
     def __str__(self):
