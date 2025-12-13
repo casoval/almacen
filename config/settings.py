@@ -53,12 +53,15 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # PARA ARCHIVOS ESTÁTICOS EN RENDER
+    'django.middleware.cache.UpdateCacheMiddleware',  # CACHE
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.gzip.GZipMiddleware',  # COMPRESIÓN
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',  # CACHE
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -90,6 +93,12 @@ DATABASES = {
     )
 }
 
+# 🚀 OPTIMIZACIÓN: Opciones específicas para PostgreSQL
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    DATABASES['default']['OPTIONS'] = {
+        'options': '-c timezone=America/La_Paz -c work_mem=64MB -c maintenance_work_mem=256MB',
+    }
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
@@ -114,6 +123,31 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# 🚀 OPTIMIZACIÓN: Cache agresivo para static files
+WHITENOISE_MAX_AGE = 31536000  # 1 año
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
+
+# =====================================================
+# CACHE CONFIGURATION (OPTIMIZACIÓN PARA RENDIMIENTO)
+# =====================================================
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# Usar Redis si está disponible (para Render)
+if os.getenv('REDIS_URL'):
+    CACHES['default'] = {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL'),
+    }
+
+# Cache timeout (1 hora)
+CACHE_MIDDLEWARE_SECONDS = 3600
 
 # Media files (archivos subidos por usuarios)
 MEDIA_URL = '/media/'

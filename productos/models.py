@@ -98,6 +98,17 @@ class Producto(models.Model):
 
     class Meta:
         ordering = ['tipo','codigo']
+        # 🚀 OPTIMIZACIÓN: Índices para búsquedas y filtros rápidos
+        indexes = [
+            models.Index(fields=['codigo']),
+            models.Index(fields=['nombre']),
+            models.Index(fields=['tipo']),
+            models.Index(fields=['categoria']),
+            models.Index(fields=['unidad_medida']),
+            models.Index(fields=['activo']),
+            # Índice compuesto para dashboard (tipo + categoria)
+            models.Index(fields=['tipo', 'categoria']),
+        ]
         verbose_name = "Producto"
         verbose_name_plural = "3.3. Productos"
         # =========================================================

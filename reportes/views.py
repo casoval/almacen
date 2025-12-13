@@ -3,7 +3,8 @@ import csv
 from datetime import datetime
 from decimal import Decimal
 from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q, Sum, Count, F, Case, When, Value, DecimalField
 from django.db.models.functions import Coalesce, TruncMonth
@@ -15,16 +16,20 @@ from beneficiarios.models import MovimientoCliente, Cliente, DetalleMovimientoCl
 from productos.models import Producto
 from reportes.models import ReporteStock, ReporteEntregas, ReporteMovimiento, ReporteStockReal
 
-
-# ==============================================================================
+# Límite para exportaciones (seguridad y rendimiento)
+MAX_EXPORT_ROWS = 50000
 #  HELPER: CÁLCULO MASIVO DE STOCK ESTÁNDAR (OPTIMIZADO)
 # ==============================================================================
 def get_stock_bulk(almacen_id, producto_id=None):
     """
     Calcula el stock físico del almacén (Entradas - Salidas +/- Traslados).
-    Ignora movimientos de clientes.
     Retorna un diccionario {producto_id: {datos}}.
     """
+    cache_key = f'stock_bulk_{almacen_id}_{producto_id or "all"}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+    
     # Filtramos movimientos donde el almacén sea origen o destino
     qs = DetalleMovimientoAlmacen.objects.filter(
         Q(movimiento__almacen_origen_id=almacen_id) | 
@@ -94,6 +99,7 @@ def get_stock_bulk(almacen_id, producto_id=None):
             'data': d # Guardamos el desglose para detalles
         }
         
+    cache.set(cache_key, result, 600)  # Cache 10 minutos
     return result
 
 # ==============================================================================
@@ -104,6 +110,11 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
     Realiza el cálculo de stock real en 2 consultas a base de datos en lugar de N*6.
     Retorna un diccionario con key = producto_id y value = datos calculados.
     """
+    cache_key = f'stock_real_bulk_{almacen_id}_{producto_id or "all"}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+    
     # 1. Movimientos de ALMACÉN (Entradas, Salidas, Traslados)
     qs_alm = DetalleMovimientoAlmacen.objects.filter(
         Q(movimiento__almacen_origen_id=almacen_id) | Q(movimiento__almacen_destino_id=almacen_id)
@@ -234,15 +245,23 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
             'data': vals # Guardamos los parciales para detalle
         }
         
+    cache.set(cache_key, result, 600)  # Cache 10 minutos
     return result
 
 
+@staff_member_required
 def obtener_datos_graficos_movimientos(request):
     """
     Retorna datos agregados por mes para graficar Entradas vs Salidas.
     ✅ CORREGIDO: Usa los nombres correctos de campos
     """
     try:
+        # Cache key basado en filtros
+        cache_key = f"graficos_mov_{request.GET.get('fecha_inicio')}_{request.GET.get('fecha_fin')}_{request.GET.get('almacen')}_{request.GET.get('proveedor')}_{request.GET.get('recepcionista')}"
+        cached = cache.get(cache_key)
+        if cached:
+            return JsonResponse(cached)
+        
         # 1. Obtener filtros de la solicitud
         fecha_inicio_str = request.GET.get('fecha_inicio')
         fecha_fin_str = request.GET.get('fecha_fin')
@@ -337,6 +356,7 @@ def obtener_datos_graficos_movimientos(request):
             ]
         }
 
+        cache.set(cache_key, datos, 300)  # Cache 5 minutos
         return JsonResponse(datos)
 
     except Exception as e:
@@ -406,7 +426,9 @@ def exportar_movimientos_excel(request):
             
         movimientos = movimientos.select_related(
             'almacen_origen', 'almacen_destino', 'proveedor', 'recepcionista'
-        ).prefetch_related('detalles__producto__unidad_medida').order_by('-fecha')
+        ).prefetch_related('detalles__producto__unidad_medida').annotate(
+            total_detalles=Count('detalles')
+        ).order_by('-fecha')[:MAX_EXPORT_ROWS]
         
     else:  # cliente
         movimientos = MovimientoCliente.objects.all()
@@ -436,10 +458,12 @@ def exportar_movimientos_excel(request):
         
         movimientos = movimientos.select_related(
             'cliente', 'almacen_origen', 'almacen_destino', 'proveedor', 'recepcionista'
-        ).prefetch_related('detalles__producto__unidad_medida').order_by('-fecha')
+        ).prefetch_related('detalles__producto__unidad_medida').annotate(
+            total_detalles=Count('detalles')
+        ).order_by('-fecha')[:MAX_EXPORT_ROWS]
     
     # Crear workbook
-    wb = Workbook()
+    wb = Workbook(write_only=True)
     ws1 = wb.active
     ws1.title = "Resumen Movimientos"
     
@@ -479,7 +503,7 @@ def exportar_movimientos_excel(request):
                 str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
                 str(movimiento.proveedor) if movimiento.proveedor else '-',
                 str(movimiento.recepcionista) if movimiento.recepcionista else '-',
-                movimiento.detalles.count()
+                movimiento.total_detalles
             ]
         else:
             row_data = [
@@ -491,26 +515,13 @@ def exportar_movimientos_excel(request):
                 str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
                 str(movimiento.proveedor) if movimiento.proveedor else '-',
                 str(movimiento.recepcionista) if movimiento.recepcionista else '-',
-                movimiento.detalles.count()
+                movimiento.total_detalles
             ]
         
         for col, value in enumerate(row_data, start=1):
             cell = ws1.cell(row=row_idx, column=col, value=value)
             cell.border = border
             cell.alignment = Alignment(horizontal='center', vertical='center')
-    
-    # Ajustar columnas hoja 1
-    for col in ws1.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(cell.value)
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 50)
-        ws1.column_dimensions[column].width = adjusted_width
     
     # Hoja 2: Detalle de productos
     ws2 = wb.create_sheet(title="Detalle Productos")
@@ -549,19 +560,6 @@ def exportar_movimientos_excel(request):
                 cell.alignment = Alignment(horizontal='center', vertical='center')
             
             detail_row += 1
-    
-    # Ajustar columnas hoja 2
-    for col in ws2.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(cell.value)
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 50)
-        ws2.column_dimensions[column].width = adjusted_width
     
     # Respuesta HTTP
     response = HttpResponse(
@@ -632,7 +630,9 @@ def exportar_movimientos_csv(request):
 
         movimientos = movimientos.select_related(
             'almacen_origen', 'almacen_destino', 'proveedor', 'recepcionista'
-        ).prefetch_related('detalles__producto__unidad_medida').order_by('-fecha')
+        ).prefetch_related('detalles__producto__unidad_medida').annotate(
+            total_detalles=Count('detalles')
+        ).order_by('-fecha')[:MAX_EXPORT_ROWS]
         
     else:  # cliente
         movimientos = MovimientoCliente.objects.all()
@@ -662,67 +662,81 @@ def exportar_movimientos_csv(request):
 
         movimientos = movimientos.select_related(
             'cliente', 'almacen_origen', 'almacen_destino', 'proveedor', 'recepcionista'
-        ).prefetch_related('detalles__producto__unidad_medida').order_by('-fecha')
+        ).prefetch_related('detalles__producto__unidad_medida').annotate(
+            total_detalles=Count('detalles')
+        ).order_by('-fecha')[:MAX_EXPORT_ROWS]
     
-    # Crear respuesta CSV
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    # Crear respuesta CSV con streaming
+    def csv_generator():
+        import io
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=';')
+        
+        # BOM para Excel
+        yield '\ufeff'
+        
+        # Encabezados
+        if tipo_reporte == 'almacen':
+            writer.writerow(['N° Movimiento', 'Tipo', 'Fecha', 'Almacén Origen', 'Almacén Destino',
+                            'Proveedor', 'Recepcionista', 'Código', 'Producto',
+                            'Cant. Buena', 'Cant. Dañada', 'Total', 'Unidad'])
+        else:
+            writer.writerow(['N° Movimiento', 'Tipo', 'Fecha', 'Cliente', 'Almacén Origen',
+                            'Almacén Destino', 'Proveedor', 'Recepcionista', 'Código',
+                            'Producto', 'Cant. Buena', 'Cant. Dañada', 'Total', 'Unidad'])
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+        
+        # Datos
+        for movimiento in movimientos:
+            for detalle in movimiento.detalles.all():
+                total = (detalle.cantidad or 0) + (detalle.cantidad_danada or 0)
+                unidad = detalle.producto.unidad_medida.abreviatura if detalle.producto.unidad_medida else 'UND'
+                
+                if tipo_reporte == 'almacen':
+                    writer.writerow([
+                        movimiento.numero_movimiento,
+                        movimiento.get_tipo_display(),
+                        movimiento.fecha.strftime('%d/%m/%Y'),
+                        str(movimiento.almacen_origen) if movimiento.almacen_origen else '-',
+                        str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
+                        str(movimiento.proveedor) if movimiento.proveedor else '-',
+                        str(movimiento.recepcionista) if movimiento.recepcionista else '-',
+                        detalle.producto.codigo,
+                        detalle.producto.nombre,
+                        detalle.cantidad or 0,
+                        detalle.cantidad_danada or 0,
+                        total,
+                        unidad
+                    ])
+                else:
+                    writer.writerow([
+                        movimiento.numero_movimiento,
+                        movimiento.get_tipo_display(),
+                        movimiento.fecha.strftime('%d/%m/%Y'),
+                        str(movimiento.cliente) if movimiento.cliente else '-',
+                        str(movimiento.almacen_origen) if movimiento.almacen_origen else '-',
+                        str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
+                        str(movimiento.proveedor) if movimiento.proveedor else '-',
+                        str(movimiento.recepcionista) if movimiento.recepcionista else '-',
+                        detalle.producto.codigo,
+                        detalle.producto.nombre,
+                        detalle.cantidad or 0,
+                        detalle.cantidad_danada or 0,
+                        total,
+                        unidad
+                    ])
+                yield output.getvalue()
+                output.seek(0)
+                output.truncate(0)
+    
+    response = StreamingHttpResponse(
+        csv_generator(),
+        content_type='text/csv; charset=utf-8'
+    )
     filename = f'movimientos_{tipo_reporte}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
     response['Content-Disposition'] = f'attachment; filename={filename}'
-    
-    # BOM para Excel
-    response.write('\ufeff')
-    
-    writer = csv.writer(response, delimiter=';')
-    
-    # Encabezados
-    if tipo_reporte == 'almacen':
-        writer.writerow(['N° Movimiento', 'Tipo', 'Fecha', 'Almacén Origen', 'Almacén Destino',
-                        'Proveedor', 'Recepcionista', 'Código', 'Producto',
-                        'Cant. Buena', 'Cant. Dañada', 'Total', 'Unidad'])
-    else:
-        writer.writerow(['N° Movimiento', 'Tipo', 'Fecha', 'Cliente', 'Almacén Origen',
-                        'Almacén Destino', 'Proveedor', 'Recepcionista', 'Código',
-                        'Producto', 'Cant. Buena', 'Cant. Dañada', 'Total', 'Unidad'])
-    
-    # Datos
-    for movimiento in movimientos:
-        for detalle in movimiento.detalles.all():
-            total = (detalle.cantidad or 0) + (detalle.cantidad_danada or 0)
-            unidad = detalle.producto.unidad_medida.abreviatura if detalle.producto.unidad_medida else 'UND'
-            
-            if tipo_reporte == 'almacen':
-                writer.writerow([
-                    movimiento.numero_movimiento,
-                    movimiento.get_tipo_display(),
-                    movimiento.fecha.strftime('%d/%m/%Y'),
-                    str(movimiento.almacen_origen) if movimiento.almacen_origen else '-',
-                    str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
-                    str(movimiento.proveedor) if movimiento.proveedor else '-',
-                    str(movimiento.recepcionista) if movimiento.recepcionista else '-',
-                    detalle.producto.codigo,
-                    detalle.producto.nombre,
-                    detalle.cantidad or 0,
-                    detalle.cantidad_danada or 0,
-                    total,
-                    unidad
-                ])
-            else:
-                writer.writerow([
-                    movimiento.numero_movimiento,
-                    movimiento.get_tipo_display(),
-                    movimiento.fecha.strftime('%d/%m/%Y'),
-                    str(movimiento.cliente) if movimiento.cliente else '-',
-                    str(movimiento.almacen_origen) if movimiento.almacen_origen else '-',
-                    str(movimiento.almacen_destino) if movimiento.almacen_destino else '-',
-                    str(movimiento.proveedor) if movimiento.proveedor else '-',
-                    str(movimiento.recepcionista) if movimiento.recepcionista else '-',
-                    detalle.producto.codigo,
-                    detalle.producto.nombre,
-                    detalle.cantidad or 0,
-                    detalle.cantidad_danada or 0,
-                    total,
-                    unidad
-                ])
     
     return response
 
@@ -830,6 +844,8 @@ def obtener_detalle_almacen(request):
     Vista optimizada para listar todos los productos de un almacén con su stock.
     """
     almacen_id = request.GET.get('almacen_id')
+    page = int(request.GET.get('page', 1))
+    limit = int(request.GET.get('limit', 50))
     if not almacen_id:
         return JsonResponse({'success': False, 'error': 'Falta almacen_id'})
     
@@ -844,7 +860,10 @@ def obtener_detalle_almacen(request):
                 'success': True,
                 'almacen': {'id': almacen.id, 'nombre': almacen.nombre},
                 'total_productos': 0,
-                'productos': []
+                'productos': [],
+                'page': page,
+                'limit': limit,
+                'total_pages': 0
             })
 
         # 2. Obtener info de productos en una sola consulta
@@ -879,11 +898,21 @@ def obtener_detalle_almacen(request):
             
         productos_list.sort(key=lambda x: x['codigo'])
         
+        # 4. Paginación
+        total_productos = len(productos_list)
+        start = (page - 1) * limit
+        end = start + limit
+        paginated_products = productos_list[start:end]
+        total_pages = (total_productos + limit - 1) // limit
+        
         return JsonResponse({
             'success': True,
             'almacen': {'id': almacen.id, 'nombre': almacen.nombre},
-            'total_productos': len(productos_list),
-            'productos': productos_list
+            'total_productos': total_productos,
+            'productos': paginated_products,
+            'page': page,
+            'limit': limit,
+            'total_pages': total_pages
         })
         
     except Exception as e:
@@ -898,6 +927,17 @@ def obtener_detalle_producto_almacenes(request):
     Vista optimizada: Muestra el stock de un producto en TODOS los almacenes.
     """
     producto_id = request.GET.get('producto_id')
+    if not producto_id:
+        return JsonResponse({'success': False, 'error': 'Falta producto_id'})
+    
+@staff_member_required
+def obtener_detalle_producto_almacenes(request):
+    """
+    Vista optimizada: Muestra el stock de un producto en TODOS los almacenes.
+    """
+    producto_id = request.GET.get('producto_id')
+    page = int(request.GET.get('page', 1))
+    limit = int(request.GET.get('limit', 50))
     if not producto_id:
         return JsonResponse({'success': False, 'error': 'Falta producto_id'})
     
@@ -932,6 +972,13 @@ def obtener_detalle_producto_almacenes(request):
                 total_sd += data['stock_danado']
                 total_st += data['stock_total']
         
+        # Paginación
+        total_almacenes = len(almacenes_list)
+        start = (page - 1) * limit
+        end = start + limit
+        paginated_almacenes = almacenes_list[start:end]
+        total_pages = (total_almacenes + limit - 1) // limit
+        
         return JsonResponse({
             'success': True,
             'producto': {
@@ -941,8 +988,11 @@ def obtener_detalle_producto_almacenes(request):
                 'categoria': producto.categoria.nombre if producto.categoria else '-',
                 'unidad': producto.unidad_medida.abreviatura if producto.unidad_medida else 'UND'
             },
-            'total_almacenes': len(almacenes_list),
-            'almacenes': almacenes_list,
+            'total_almacenes': total_almacenes,
+            'almacenes': paginated_almacenes,
+            'page': page,
+            'limit': limit,
+            'total_pages': total_pages,
             'totales': {
                 'stock_bueno': str(total_sb),
                 'stock_danado': str(total_sd),

@@ -32,6 +32,12 @@ class Proveedor(models.Model):
         verbose_name = _("Proveedor")
         verbose_name_plural = _("4.1. Proveedores / Transporte")
         ordering = ['nombre']
+        # 🚀 OPTIMIZACIÓN: Índices para búsquedas
+        indexes = [
+            models.Index(fields=['nombre']),
+            models.Index(fields=['activo']),
+            models.Index(fields=['email']),
+        ]
 
     def __str__(self):
         return self.nombre

@@ -350,6 +350,9 @@ class DetalleMovimientoAlmacen(models.Model):
         indexes = [
             models.Index(fields=['producto']),
             models.Index(fields=['movimiento']),
+            # Índices compuestos para queries de stock masivas
+            models.Index(fields=['producto', 'movimiento']),
+            models.Index(fields=['movimiento', 'producto']),
         ]
 
     def __str__(self):

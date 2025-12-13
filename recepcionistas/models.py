@@ -27,6 +27,12 @@ class Recepcionista(models.Model):
         verbose_name = _("Recepcionista")
         verbose_name_plural = _("5.1. Recepcionistas / Encargados")
         ordering = ['nombre']
+        # 🚀 OPTIMIZACIÓN: Índices para búsquedas
+        indexes = [
+            models.Index(fields=['nombre']),
+            models.Index(fields=['activo']),
+            models.Index(fields=['email']),
+        ]
 
     def __str__(self):
         return self.nombre
