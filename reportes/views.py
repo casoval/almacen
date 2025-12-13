@@ -18,138 +18,64 @@ from reportes.models import ReporteStock, ReporteEntregas, ReporteMovimiento, Re
 
 # Límite para exportaciones (seguridad y rendimiento)
 MAX_EXPORT_ROWS = 25000  # Reducido de 50k a 25k para mejor rendimiento
-#  HELPER: CÁLCULO MASIVO DE STOCK ESTÁNDAR (OPTIMIZADO)
+#  HELPER: CÁLCULO MASIVO DE STOCK ESTÁNDAR (OPTIMIZADO CON CACHE)
 # ==============================================================================
 def get_stock_bulk(almacen_id, producto_id=None):
     """
-    Calcula el stock físico del almacén usando raw SQL para máxima velocidad.
+    Obtiene el stock físico del almacén desde la tabla StockCache pre-calculada.
+    🚀 OPTIMIZACIÓN EXTREMA: Lectura instantánea desde cache pre-calculado
     """
-    cache_key = f'stock_bulk_{almacen_id}_{producto_id or "all"}'
+    cache_key = f'stock_cache_bulk_{almacen_id}_{producto_id or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
     
-    from django.db import connection
-    
-    # Raw SQL optimizado para PostgreSQL
-    sql = """
-    SELECT
-        d.producto_id,
-        SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
-        ) AS stock_bueno,
-        SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) AS stock_danado
-    FROM almacenes_detallemovimientoalmacen d
-    JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
-    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s)
-    """
-    params = [almacen_id] * 10
-    
+    from stock_cache.models import StockCache
+
+    # Query ultra-optimizada: solo campos necesarios, sin select_related para velocidad máxima
+    queryset = StockCache.objects.filter(almacen_id=almacen_id)
+
     if producto_id:
-        sql += " AND d.producto_id = %s"
-        params.append(producto_id)
-    
-    sql += " GROUP BY d.producto_id"
-    
-    with connection.cursor() as cursor:
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-    
+        queryset = queryset.filter(producto_id=producto_id)
+
+    # Ejecutar query y construir resultado
     result = {}
-    for row in rows:
-        pid, sb, sd = row
-        sb = sb or Decimal(0)
-        sd = sd or Decimal(0)
-        result[pid] = {
-            'stock_bueno': sb,
-            'stock_danado': sd,
-            'stock_total': sb + sd,
-            'data': {}  # Simplificado
+    for stock_entry in queryset.values('producto_id', 'stock_bueno', 'stock_danado', 'stock_total'):
+        result[stock_entry['producto_id']] = {
+            'stock_bueno': stock_entry['stock_bueno'],
+            'stock_danado': stock_entry['stock_danado'],
+            'stock_total': stock_entry['stock_total'],
+            'data': {}  # Mantener compatibilidad con código existente
         }
-    
-    cache.set(cache_key, result, 3600)  # Cache 1 hora para mejor rendimiento con muchos productos
+
+    # Cache por 1 hora para máxima velocidad
+    cache.set(cache_key, result, 3600)
     return result
 
 # ==============================================================================
-#  HELPER: CÁLCULO MASIVO DE STOCK REAL (OPTIMIZACIÓN CLAVE)
+#  HELPER: CÁLCULO MASIVO DE STOCK REAL (OPTIMIZACIÓN EXTREMA)
 # ==============================================================================
 def get_stock_real_bulk(almacen_id, producto_id=None):
     """
-    Calcula el stock real del almacén usando raw SQL para máxima velocidad.
-    Incluye movimientos de almacén y cliente.
+    Calcula el stock real del almacén usando StockCache + ajustes de cliente.
+    🚀 OPTIMIZACIÓN EXTREMA: Stock físico desde cache pre-calculado
     """
-    cache_key = f'stock_real_bulk_{almacen_id}_{producto_id or "all"}'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
-    
+    from stock_cache.models import StockCache
     from django.db import connection
-    
-    # Raw SQL para movimientos de almacén
-    sql_alm = """
-    SELECT
-        d.producto_id,
-        SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad ELSE 0 END
-        ) AS stock_bueno_alm,
-        SUM(
-            CASE
-                WHEN m.tipo = 'ENTRADA' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'SALIDA' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) + SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_destino_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) - SUM(
-            CASE
-                WHEN m.tipo = 'TRASLADO' AND m.almacen_origen_id = %s THEN d.cantidad_danada ELSE 0 END
-        ) AS stock_danado_alm
-    FROM almacenes_detallemovimientoalmacen d
-    JOIN almacenes_movimientoalmacen m ON d.movimiento_id = m.id
-    WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s)
-    """
-    params_alm = [almacen_id] * 10
-    
+
+    # Obtener stock físico desde cache pre-calculado
+    queryset = StockCache.objects.filter(almacen_id=almacen_id)
     if producto_id:
-        sql_alm += " AND d.producto_id = %s"
-        params_alm.append(producto_id)
-    
-    sql_alm += " GROUP BY d.producto_id"
-    
-    # Raw SQL para movimientos de cliente
+        queryset = queryset.filter(producto_id=producto_id)
+
+    stock_fisico = {}
+    for stock_entry in queryset:
+        stock_fisico[stock_entry.producto_id] = {
+            'stock_bueno_alm': stock_entry.stock_bueno,
+            'stock_danado_alm': stock_entry.stock_danado,
+        }
+
+    # Calcular ajustes de movimientos de cliente (esto aún requiere cálculo)
     sql_cli = """
     SELECT
         d.producto_id,
@@ -172,36 +98,30 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
     WHERE (m.almacen_origen_id = %s OR m.almacen_destino_id = %s) AND m.tipo != 'TRASLADO'
     """
     params_cli = [almacen_id] * 6
-    
+
     if producto_id:
         sql_cli += " AND d.producto_id = %s"
         params_cli.append(producto_id)
-    
+
     sql_cli += " GROUP BY d.producto_id"
-    
+
     with connection.cursor() as cursor:
-        cursor.execute(sql_alm, params_alm)
-        rows_alm = cursor.fetchall()
-        
         cursor.execute(sql_cli, params_cli)
         rows_cli = cursor.fetchall()
-    
+
     # Combinar resultados
     stock_map = {}
-    
-    # Procesar almacén
-    for row in rows_alm:
-        pid, sb_alm, sd_alm = row
-        sb_alm = sb_alm or Decimal(0)
-        sd_alm = sd_alm or Decimal(0)
+
+    # Inicializar con stock físico
+    for pid, vals in stock_fisico.items():
         stock_map[pid] = {
-            'stock_bueno_alm': sb_alm,
-            'stock_danado_alm': sd_alm,
+            'stock_bueno_alm': vals['stock_bueno_alm'],
+            'stock_danado_alm': vals['stock_danado_alm'],
             'stock_bueno_cli': Decimal(0),
             'stock_danado_cli': Decimal(0),
         }
-    
-    # Procesar cliente
+
+    # Agregar ajustes de cliente
     for row in rows_cli:
         pid, sb_cli, sd_cli = row
         sb_cli = sb_cli or Decimal(0)
@@ -215,7 +135,7 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
             }
         stock_map[pid]['stock_bueno_cli'] = sb_cli
         stock_map[pid]['stock_danado_cli'] = sd_cli
-    
+
     # Calcular totales
     result = {}
     for pid, vals in stock_map.items():
@@ -227,8 +147,7 @@ def get_stock_real_bulk(almacen_id, producto_id=None):
             'stock_total': sb + sd,
             'data': vals
         }
-    
-    cache.set(cache_key, result, 3600)  # Cache 1 hora para mejor rendimiento con muchos productos/clientes
+
     return result
 
 

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     # Apps externas
     'rest_framework',
     'django_htmx',
+    'corsheaders',  # CORS headers
 
     # Nuestras apps:
     'productos',
@@ -48,9 +49,11 @@ INSTALLED_APPS = [
     'beneficiarios.apps.BeneficiariosConfig',
     'usuarios',
     'reportes',
+    'stock_cache',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware (primero)
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # PARA ARCHIVOS ESTÁTICOS EN RENDER
     'django.middleware.cache.UpdateCacheMiddleware',  # CACHE
@@ -173,3 +176,97 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # EMAIL_USE_TLS = True
 # EMAIL_HOST_USER = 'tu_correo@gmail.com'
 # EMAIL_HOST_PASSWORD = 'xxxx xxxx xxxx xxxx'
+
+# =====================================================
+# CONFIGURACIONES DE PERMISOS Y CORS (ALLOW ALL)
+# =====================================================
+
+# CORS - Permitir todo
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://localhost:3000",
+    "https://127.0.0.1:3000",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# CSRF - Permitir todo para desarrollo
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://localhost:3000",
+    "https://127.0.0.1:3000",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
+]
+
+# Si estamos en desarrollo, deshabilitar CSRF completamente
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = ["*"]
+    CORS_ALLOW_ALL_ORIGINS = True
+
+# X-Frame-Options - Permitir embedding
+X_FRAME_OPTIONS = 'ALLOWALL'
+
+# Content Security Policy - Permisivo para desarrollo
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
+CSP_IMG_SRC = ("'self'", "data:", "https:")
+CSP_FONT_SRC = ("'self'", "https:", "data:")
+CSP_CONNECT_SRC = ("'self'", "https:", "http:")
+
+# Django REST Framework - Permisos permisivos
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
+}
+
+# Security Middleware - Permisivo para desarrollo
+SECURE_CONTENT_TYPE_NOSNIFF = False
+SECURE_BROWSER_XSS_FILTER = False
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
